@@ -49,10 +49,10 @@ from collections import Counter, defaultdict
 from typing import Tuple, List, Dict, Optional, Sequence
 import warnings
 from statsmodels.tools.sm_exceptions import PerfectSeparationError, ConvergenceWarning
-
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import torch
+import gc
 
 from transformers import (
     GenerationConfig,            # for Molmo
@@ -484,17 +484,99 @@ def _draw_component(
             )
 
     return {"label": label, "bbox": bbox, "ports": ports}, side
-def _orthogonal_polyline(p0: Tuple[int,int], p1: Tuple[int,int]) -> List[Tuple[int,int]]:
+
+def do_segments_collide_strict(seg1: Tuple[Tuple[int,int],Tuple[int,int]],
+                               seg2: Tuple[Tuple[int,int],Tuple[int,int]],
+                               wire_width: int) -> bool:
     """
-    Return a two-segment (L-shaped) polyline between p0→p1, but
-    randomly choosing whether to go horizontal→vertical or vertical→horizontal.
-    Ensures any intersection with other wires is at right angles.
+    Checks if two H/V wire segments visually collide, considering wire width.
+    Assumes seg1 and seg2 are primarily horizontal or vertical (from orthogonal paths).
+    Collision means:
+    1. Their centerlines properly intersect (standard geometric intersection).
+    2. They are parallel (both H or both V) and their bounding boxes (inflated by
+       wire_width) overlap.
+    3. One is H, one is V, and their bounding boxes (inflated by wire_width)
+       intersect (catches corner cases where widths cause collision).
+    """
+    # Check for proper centerline intersection first
+    if segments_intersect(seg1, seg2): # segments_intersect is your existing function
+        return True
+
+    # Define bounding boxes for the actual wire areas (not just centerlines)
+    (x1_s1, y1_s1), (x2_s1, y2_s1) = seg1
+    (x1_s2, y1_s2), (x2_s2, y2_s2) = seg2
+
+    # Determine orientation and bounds for seg1's rectangle
+    s1_is_h = (y1_s1 == y2_s1)
+    s1_is_v = (x1_s1 == x2_s1)
+    
+    # Integer arithmetic for wire width halves
+    # (width-1)//2 for the "lower" part from centerline, width//2 for "upper"
+    # e.g., width 4: center c, pixels c-1, c, c+1, c+2. Range is [c-( (4-1)//2 ), c + (4//2) ] = [c-1, c+2]
+    # e.g., width 3: center c, pixels c-1, c, c+1. Range is [c-( (3-1)//2 ), c + (3//2) ] = [c-1, c+1]
+    ww_half_low = (wire_width - 1) // 2
+    ww_half_high = wire_width // 2
+
+    rect1_l, rect1_r, rect1_b, rect1_t = 0,0,0,0
+    if s1_is_h: # seg1 is Horizontal
+        rect1_l = min(x1_s1, x2_s1)
+        rect1_r = max(x1_s1, x2_s1)
+        rect1_b = y1_s1 - ww_half_low
+        rect1_t = y1_s1 + ww_half_high
+    elif s1_is_v: # seg1 is Vertical
+        rect1_b = min(y1_s1, y2_s1)
+        rect1_t = max(y1_s1, y2_s1)
+        rect1_l = x1_s1 - ww_half_low
+        rect1_r = x1_s1 + ww_half_high
+    else: # seg1 is diagonal - this strict check is mainly for H/V paths.
+          # If segments_intersect didn't catch it, assume no collision for this specialized check.
+        return False 
+
+    # Determine orientation and bounds for seg2's rectangle
+    s2_is_h = (y1_s2 == y2_s2)
+    s2_is_v = (x1_s2 == x2_s2)
+    rect2_l, rect2_r, rect2_b, rect2_t = 0,0,0,0
+    if s2_is_h: # seg2 is Horizontal
+        rect2_l = min(x1_s2, x2_s2)
+        rect2_r = max(x1_s2, x2_s2)
+        rect2_b = y1_s2 - ww_half_low
+        rect2_t = y1_s2 + ww_half_high
+    elif s2_is_v: # seg2 is Vertical
+        rect2_b = min(y1_s2, y2_s2)
+        rect2_t = max(y1_s2, y2_s2)
+        rect2_l = x1_s2 - ww_half_low
+        rect2_r = x1_s2 + ww_half_high
+    else: # seg2 is diagonal
+        return False
+
+    # Standard AABB (Axis-Aligned Bounding Box) intersection test
+    # True if rectangles overlap
+    no_horizontal_overlap = rect1_r <= rect2_l or rect1_l >= rect2_r
+    no_vertical_overlap = rect1_t <= rect2_b or rect1_b >= rect2_t
+    
+    if no_horizontal_overlap or no_vertical_overlap:
+        return False # No collision
+    else:
+        return True  # Collision detected
+
+def _orthogonal_polyline(p0: Tuple[int,int], p1: Tuple[int,int], force_direction: Optional[str] = None) -> List[Tuple[int,int]]:
+    """
+    Return a two-segment (L-shaped) polyline between p0→p1.
+    force_direction: "h_first" (horizontal then vertical) or 
+                     "v_first" (vertical then horizontal) to override random choice.
     """
     x0, y0 = p0
     x1, y1 = p1
 
-    # randomly choose segment order
-    if random.random() < 0.5:
+    horizontal_first_chosen: bool
+    if force_direction == "h_first":
+        horizontal_first_chosen = True
+    elif force_direction == "v_first":
+        horizontal_first_chosen = False
+    else: # Default random choice
+        horizontal_first_chosen = random.random() < 0.5
+    
+    if horizontal_first_chosen:
         # horizontal first, then vertical
         mid = (x1, y0)
     else:
@@ -573,28 +655,30 @@ def _diagonal_polyline(
     # if no parallel overlap, just return the simple two-leg
     return path
 def generate_circuit_image(
-        *,
-        min_components: int,
-        max_components: int,
-        min_ports: int,
-        max_ports: int,
-        min_wires: int,
-        max_wires: int,
-        min_cc_wires: int,
-        max_cc_wires: int,
+    *,
+    min_components: int,
+    max_components: int,
+    min_ports: int,
+    max_ports: int,
+    min_wires: int,
+    max_wires: int,
+    min_cc_wires: int,
+    max_cc_wires: int,
+    wire_color_mode: str = "default",
+    no_wire_crossing: bool = False,
     ) -> Tuple[Image.Image, int, str, Dict[int, str], Dict[int, Dict[str, object]]]:
     """
     Build a synthetic circuit and return:
 
     img               : PIL.Image
-    query_port        : int   (breadboard port 1–10)
-    correct_component : str   (e.g. "C3")
+    query_port        : int  (breadboard port 1–10)
+    correct_component : str  (e.g. "C3")
     mapping           : {breadboard_port → component_label}
     wire_info         : {
         breadboard_port → {
-            'length': float,        # polyline length in pixels
-            'euclid_dist': float,   # straight-line distance in pixels
-            'crossings': int,       # number of times this wire crosses any existing wire
+            'length': float,      # polyline length in pixels
+            'euclid_dist': float, # straight-line distance in pixels
+            'crossings': int,     # number of times this wire crosses any existing wire
             'color': str
         }
     }
@@ -603,6 +687,15 @@ def generate_circuit_image(
         "#ffd0d0", "#d0ffd0", "#d0d0ff", "#fff0d0",
         "#d0f0ff", "#f0d0ff", "#e0ffe0", "#ffe0ff",
     ]
+    # Expanded wire colors for 'unique' mode, ensure enough for typical max wires
+    EXTENDED_WIRE_COLOURS = WIRE_COLOURS + [
+        '#FF1493', '#00FFFF', '#FFD700', '#ADFF2F', '#FF00FF', '#1E90FF', # HotPink, Aqua, Gold, GreenYellow, Fuchsia, DodgerBlue
+        '#D2691E', '#8A2BE2', '#00FA9A', '#DC143C', '#7FFF00', '#BDB76B', # Chocolate, BlueViolet, MediumSpringGreen, Crimson, Chartreuse, DarkKhaki
+        '#FF8C00', '#48D1CC', '#C71585', '#7CFC00', '#BA55D3', '#20B2AA'  # DarkOrange, MediumTurquoise, MediumVioletRed, LawnGreen, MediumOrchid, LightSeaGreen
+    ]
+    generated_single_color = None
+    if wire_color_mode == "single":
+        generated_single_color = random.choice(WIRE_COLOURS)
 
     # 1) create blank canvas
     img  = Image.new("RGB", (CANVAS_W, CANVAS_H), "white")
@@ -626,7 +719,6 @@ def generate_circuit_image(
         occupied.append(comp["bbox"])
         components.append(comp)
 
-    # 4) connect breadboard → components
     all_segments: List[Tuple[Tuple[int,int], Tuple[int,int]]] = []
     mapping: Dict[int,str] = {}
     wire_info: Dict[int,Dict[str,object]] = {}
@@ -634,86 +726,172 @@ def generate_circuit_image(
 
     avail_bread = list(range(1, 11))
     random.shuffle(avail_bread)
-    target_wires = random.randint(min_wires, min(max_wires, len(avail_bread)))
+    # Ensure min_wires is respected if possible, up to max_wires or available ports
+    target_bb_wires = random.randint(min_wires, min(max_wires, len(avail_bread), len(components) * max_ports))
+    
+    bb_wires_drawn_count = 0
 
-    for idx in avail_bread:
-        if len(mapping) >= target_wires:
+    # 4) connect breadboard → components
+    for bb_port_idx in avail_bread:
+        if bb_wires_drawn_count >= target_bb_wires:
             break
 
-        p0 = bread_ports[idx - 1]
-        comp = random.choice(components)
-        free_ports = [
-            pt for pt in comp["ports"]
-            if (comp["label"], pt) not in used_comp_ports
-        ]
-        if not free_ports:
-            continue
+        p0_bb = bread_ports[bb_port_idx - 1]
+        
+        # Try to find a component with a free port
+        random.shuffle(components) # Try components in random order
+        connection_made_for_bb_port = False
+        for comp_obj in components:
+            free_comp_ports = [
+                pt for pt in comp_obj["ports"]
+                if (comp_obj["label"], pt) not in used_comp_ports
+            ]
+            if not free_comp_ports:
+                continue
 
-        p1 = random.choice(free_ports)
-        used_comp_ports.add((comp["label"], p1))
+            p1_comp = random.choice(free_comp_ports)
+            
+            poly_path = None
+            path_found_for_pair = False
 
-        # choose a path avoiding parallel overlaps
-        poly = _diagonal_polyline(p0, p1, all_segments)
-        wire_col = random.choice(WIRE_COLOURS)
-        draw.line(poly, fill=wire_col, width=WIRE_WIDTH)
+            if no_wire_crossing:
+                # Try horizontal-first orthogonal path
+                poly_h_first = _orthogonal_polyline(p0_bb, p1_comp, force_direction="h_first")
+                # USE do_segments_collide HERE
+                collides_h_first = any(do_segments_collide_strict(seg_h, old_seg, WIRE_WIDTH) for seg_h in zip(poly_h_first, poly_h_first[1:]) for old_seg in all_segments)
 
-        # compute metrics
-        #  - polyline length
-        length = sum(
-            math.hypot(x2 - x1, y2 - y1)
-            for (x1, y1), (x2, y2) in zip(poly, poly[1:])
-        )
-        #  - straight-line Euclidean distance
-        euclid_dist = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
-        #  - count crossings with previous segments
-        crossings = 0
-        for seg in zip(poly, poly[1:]):
-            for old in all_segments:
-                if segments_intersect(seg, old):
-                    crossings += 1
+                if not collides_h_first:
+                    poly_path = poly_h_first
+                    path_found_for_pair = True
+                else:
+                    # Try vertical-first orthogonal path
+                    poly_v_first = _orthogonal_polyline(p0_bb, p1_comp, force_direction="v_first")
+                    # USE do_segments_collide HERE
+                    # USE do_segments_collide_strict HERE
+                    collides_v_first = any(do_segments_collide_strict(seg_v, old_seg, WIRE_WIDTH) for seg_v in zip(poly_v_first, poly_v_first[1:]) for old_seg in all_segments)
+                    if not collides_v_first:
+                        poly_path = poly_v_first
+                        path_found_for_pair = True
+            else: # Original behavior (allow crossing, use diagonal)
+                poly_path = _diagonal_polyline(p0_bb, p1_comp, all_segments)
+                path_found_for_pair = True # Assume diagonal path is always "found"
 
-        mapping[idx] = comp["label"]
-        wire_info[idx] = {
-            "length":      length,
-            "euclid_dist": euclid_dist,
-            "crossings":   crossings,
-            "color":       wire_col,
-        }
+            if path_found_for_pair and poly_path:
+                used_comp_ports.add((comp_obj["label"], p1_comp)) # Occupy port only if path is found
 
-        # record each drawn segment
-        for a, b in zip(poly, poly[1:]):
-            all_segments.append((a, b))
+                wire_col_bb: str
+                if wire_color_mode == "single":
+                    wire_col_bb = generated_single_color
+                elif wire_color_mode == "unique":
+                    color_idx = len(mapping) # Based on successfully mapped BB wires
+                    wire_col_bb = EXTENDED_WIRE_COLOURS[color_idx % len(EXTENDED_WIRE_COLOURS)]
+                else: # "default"
+                    wire_col_bb = random.choice(WIRE_COLOURS)
+                
+                draw.line(poly_path, fill=wire_col_bb, width=WIRE_WIDTH)
+
+                length = sum(math.hypot(x2 - x1, y2 - y1) for (x1, y1), (x2, y2) in zip(poly_path, poly_path[1:]))
+                euclid_dist = math.hypot(p1_comp[0] - p0_bb[0], p1_comp[1] - p0_bb[1])
+                
+                current_crossings = 0
+                for new_seg in zip(poly_path, poly_path[1:]):
+                    for old_s in all_segments:
+                        if segments_intersect(new_seg, old_s):
+                            current_crossings +=1
+                
+                mapping[bb_port_idx] = comp_obj["label"]
+                wire_info[bb_port_idx] = {
+                    "length": length, "euclid_dist": euclid_dist,
+                    "crossings": current_crossings, "color": wire_col_bb,
+                }
+                for a, b in zip(poly_path, poly_path[1:]):
+                    all_segments.append((a, b))
+                
+                bb_wires_drawn_count += 1
+                connection_made_for_bb_port = True
+                break # Connected this breadboard port, move to the next one
+        # If loop finishes without connection_made_for_bb_port, this bb_port_idx is skipped.
 
     # 5) connect component ↔ component wires (visual only)
-    cc_target, wires_drawn = random.randint(min_cc_wires, max_cc_wires), 0
-    while wires_drawn < cc_target:
-        free_pool = [
-            (comp, pt)
-            for comp in components
-            for pt in comp["ports"]
-            if (comp["label"], pt) not in used_comp_ports
-        ]
-        if len(free_pool) < 2:
-            break
-        comp1, p1 = random.choice(free_pool)
-        free_pool_2 = [p for p in free_pool if p[0]["label"] != comp1["label"]]
-        if not free_pool_2:
-            break
-        comp2, p2 = random.choice(free_pool_2)
+    target_cc_wires = random.randint(min_cc_wires, max_cc_wires)
+    cc_wires_drawn_count = 0
+    
+    # Create a list of all component ports with their component labels
+    all_component_ports_with_labels = []
+    for comp_obj in components:
+        for p_idx, port_coord in enumerate(comp_obj["ports"]):
+             all_component_ports_with_labels.append({'label': comp_obj["label"], 'coord': port_coord, 'id': (comp_obj["label"], port_coord)})
 
-        used_comp_ports.add((comp1["label"], p1))
-        used_comp_ports.add((comp2["label"], p2))
-        poly = _diagonal_polyline(p1, p2, all_segments)
-        draw.line(poly, fill=random.choice(WIRE_COLOURS), width=WIRE_WIDTH)
-        for a, b in zip(poly, poly[1:]):
-            all_segments.append((a, b))
-        wires_drawn += 1
+    for _ in range(target_cc_wires * 5): # Try more times to find valid pairs
+        if cc_wires_drawn_count >= target_cc_wires:
+            break
 
+        available_for_cc = [p for p in all_component_ports_with_labels if p['id'] not in used_comp_ports]
+        if len(available_for_cc) < 2:
+            break
+
+        comp1_port_info = random.choice(available_for_cc)
+        # Find a port from a *different* component
+        comp2_options = [p for p in available_for_cc if p['label'] != comp1_port_info['label']]
+        if not comp2_options:
+            continue
+        comp2_port_info = random.choice(comp2_options)
+
+        p1_cc, p2_cc = comp1_port_info['coord'], comp2_port_info['coord']
+        
+        poly_path_cc = None
+        path_found_cc = False
+        if no_wire_crossing:
+            poly_h_cc = _orthogonal_polyline(p1_cc, p2_cc, force_direction="h_first")
+            # USE do_segments_collide HERE
+            if not any(do_segments_collide_strict(s, o, WIRE_WIDTH) for s in zip(poly_h_cc, poly_h_cc[1:]) for o in all_segments):
+                poly_path_cc = poly_h_cc
+                path_found_cc = True
+            else:
+                poly_v_cc = _orthogonal_polyline(p1_cc, p2_cc, force_direction="v_first")
+                # USE do_segments_collide HERE
+                # USE do_segments_collide_strict HERE
+                if not any(do_segments_collide_strict(s, o, WIRE_WIDTH) for s in zip(poly_v_cc, poly_v_cc[1:]) for o in all_segments):
+                    poly_path_cc = poly_v_cc
+                    path_found_cc = True
+        else:
+            poly_path_cc = _diagonal_polyline(p1_cc, p2_cc, all_segments)
+            path_found_cc = True
+
+        if path_found_cc and poly_path_cc:
+            used_comp_ports.add(comp1_port_info['id'])
+            used_comp_ports.add(comp2_port_info['id'])
+
+            cc_wire_color: str
+            if wire_color_mode == "single":
+                cc_wire_color = generated_single_color
+            elif wire_color_mode == "unique":
+                # Total wires so far: bb_wires + current_cc_wires
+                color_idx = len(mapping) + cc_wires_drawn_count 
+                cc_wire_color = EXTENDED_WIRE_COLOURS[color_idx % len(EXTENDED_WIRE_COLOURS)]
+            else: # "default"
+                cc_wire_color = random.choice(WIRE_COLOURS)
+
+            draw.line(poly_path_cc, fill=cc_wire_color, width=WIRE_WIDTH)
+            for a, b in zip(poly_path_cc, poly_path_cc[1:]):
+                all_segments.append((a, b))
+            cc_wires_drawn_count += 1
+            
     # 6) pick a query port that is definitely wired
+    if not mapping:
+        # This can happen if min_wires is 0, or if no_wire_crossing prevented any wires.
+        # Create a dummy response or handle as an edge case.
+        # For robustness in testing, let's return a default if no wires are mapped.
+        # The calling code might need to handle this (e.g. skip analysis for such an image).
+        print("Warning: No breadboard wires were successfully placed for query generation.", file=sys.stderr)
+        # Return a default query, image might be "empty" of connections.
+        # This ensures the function doesn't crash but the trial might be invalid.
+        return img, 1, "C1", {}, {} # Dummy query_port, correct_comp, empty mappings
+
     query_port = random.choice(list(mapping.keys()))
+    correct_comp_label = mapping[query_port]
 
-    return img, query_port, mapping[query_port], mapping, wire_info
-
+    return img, query_port, correct_comp_label, mapping, wire_info
 # ─────────── Few‑shot example builder ───────────
 def generate_two_shot_examples(
     odir: str = "few_shot_examples",
@@ -730,6 +908,8 @@ def generate_two_shot_examples(
         img.save(f"{odir}/two_shot_{i}.png")
         prompt = (
             f"Which component does the wire from port {qport} on the breadboard, which is the gray rectangle with numbered ports, connect to? "
+            "A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. "
+            "A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. "
             "Answer with the component label in curly braces, e.g {C0}."
         )
         examples.append((img, prompt, f"After following the wire, it connects to {comp_label}. {{{comp_label}}}"))
@@ -801,9 +981,9 @@ class InferenceClient:
     # ────────────────────────────────── core multimodal generation helper ───────
     # ---------------------------------------------------------------------------
     @staticmethod
-    def _data_url(b64: str) -> dict:
-        """Helper for OpenRouter image payload."""
-        return {"url": f"data:image/png;base64,{b64}"}
+    def _data_url(b64: str) -> str:
+        # CORRECT: returns the raw data‐URL string
+        return f"data:image/png;base64,{b64}"
 
     def _or_post(self, messages: list[dict]) -> str:
         """Call OpenRouter and return the assistant’s reply text."""
@@ -823,7 +1003,7 @@ class InferenceClient:
             return r.json()["choices"][0]["message"]["content"]
         except Exception as e:
             print(f"[OpenRouter error] {e}")
-            return random.choice(["{{no}}", "{{yes}}"])
+            return random.choice(["{{C0}}", "{{C1}}"])
 
     # ─────────────────────────── ask_pair (unused in visual‑search) ─────────────
     def ask_pair(self, prompt: str, b1: str, b2: str, few_shot: bool) -> str:
@@ -904,7 +1084,7 @@ class InferenceClient:
                 return resp.output_text
             except Exception as e:
                 print(f"[OpenAI error] {e}", file=sys.stderr)
-                return random.choice(["{C1}", "{C2}"])
+                return random.choice(["{{C0}}", "{{C1{}}"])
 
         # ─── OpenRouter remote ────────────────────────────────────────────────
         # Only send text + image_url entries (no PIL.Image)
@@ -968,11 +1148,21 @@ def delta_log_odds(recs:List[dict]):
 # ─────────── Main ───────────
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--models", nargs="+", default=[
-        "local:llama"
-        #"openai:o3-2025-04-16",
-        #"openrouter:google/gemini-2.5-pro-preview",
-    ])
+    ap.add_argument("--models", nargs="+", default=
+                    [
+                    # "openai:o3-2025-04-16",
+                    "openrouter:anthropic/claude-3.7-sonnet:thinking",
+                    "openrouter:google/gemini-2.5-pro-preview",
+                    "openai:o4-mini-2025-04-16",
+                    # "local:google/gemma-3-27b-it",
+                    # "local:allenai/Molmo-7B-D-0924",
+                    # "local:mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+                    # "local:qwen",
+                    # "local:qwen2.5-vl-32b",
+                    # "local:OpenGVLab/InternVL3-14B",
+                    # "local:microsoft/Phi-4-multimodal-instruct",
+                    # "local:llama",
+                    ])
     ap.add_argument("--num",          type=int, default=5)
     ap.add_argument("--few-shot",     action="store_true")
     ap.add_argument("--verbose",      action="store_true")
@@ -981,7 +1171,7 @@ def main():
     ap.add_argument("--local-model-path", type=str, default=None)
 
     # generation controls
-    ap.add_argument("--min-components",  type=int, default=4)
+    ap.add_argument("--min-components",  type=int, default=5)
     ap.add_argument("--max-components",  type=int, default=10)
     ap.add_argument("--min-ports",       type=int, default=1)
     ap.add_argument("--max-ports",       type=int, default=3)
@@ -989,6 +1179,13 @@ def main():
     ap.add_argument("--max-wires",       type=int, default=15)
     ap.add_argument("--min-cc-wires",    type=int, default=0)
     ap.add_argument("--max-cc-wires",    type=int, default=6)
+
+    # wire drawing options
+    ap.add_argument("--wire-color-mode", type=str, default="default",
+                    choices=["default", "single", "unique"],
+                    help="Wire color strategy: 'default' (random from list), 'single' (all one color), 'unique' (each wire different color if possible)")
+    ap.add_argument("--no-wire-crossing", action="store_true",
+                    help="Attempt to draw wires that do not cross each other (may result in fewer wires and use orthogonal paths).")
 
     # new dataset flags
     ap.add_argument("--make-dataset", type=str,
@@ -1011,6 +1208,8 @@ def main():
         max_wires=args.max_wires,
         min_cc_wires=args.min_cc_wires,
         max_cc_wires=args.max_cc_wires,
+        wire_color_mode=args.wire_color_mode,
+        no_wire_crossing=args.no_wire_crossing,
     )
 
     # 1) Build two few-shot demos once
@@ -1057,6 +1256,8 @@ def main():
                 prompt = (
                     f"Which component does the wire from port {q} on the breadboard, "
                     "which is the gray rectangle with numbered ports, connect to? "
+                    "A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. "
+                    "A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. "
                     "Answer with the component label in curly braces, e.g {C3}."
                 )
                 meta = {
@@ -1152,6 +1353,8 @@ def main():
                     client.client.to("cpu")
             except:
                 pass
+            del client
+            gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
@@ -1178,6 +1381,8 @@ def main():
                 prompt = (
                     f"Which component does the wire from port {q} on the breadboard, "
                     "which is the gray rectangle with numbered ports, connect to? "
+                    "A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. "
+                    "A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. "
                     "Answer with the component label in curly braces, e.g {C3}."
                 )
                 raw  = client.ask_single(prompt, encode(img), few_flag)

@@ -46,6 +46,7 @@ Usage:
 import os
 import sys
 import re
+import gc
 import random
 import math
 import base64
@@ -243,7 +244,8 @@ class InferenceClient:
         self.model_name = model_name
         self.model_path = model_path
         self.fs_examples = fs_examples or []
-        
+        self.max_retries = 3  # Or your preferred number of retries
+        self.initial_wait_time = 5  # Initial wait time in seconds
         if use_local:
             self.client, self.processor, self.device = LocalFetcher(
                 model_path=self.model_path,
@@ -256,7 +258,7 @@ class InferenceClient:
             key = api_key or os.getenv("OPENAI_LAB_KEY")
             if key is None:
                 raise RuntimeError("OPENAI_LAB_KEY is not set")
-            self.client = openai.OpenAI(api_key=key,timeout=1000)
+            self.client = openai.OpenAI(api_key=key,timeout=2000)
 
         else:
             import openai
@@ -310,7 +312,7 @@ class InferenceClient:
         if not few_shot:
             # no-shot: exactly as before
             if backend == "local":
-                return run_inference(self.client, self.processor,
+                return run_inference(self.client, self.processor, self.model_name,
                                           images=[img], query=prompt,
                                           temperature=0.0001)
             elif backend == "openai":
@@ -318,8 +320,7 @@ class InferenceClient:
                 key = os.getenv("OPENAI_LAB_KEY")
                 if key is None:
                     raise RuntimeError("OPENAI_LAB_KEY not set")
-                client = openai.OpenAI(api_key=key, timeout=1000)
-                resp = client.responses.create(
+                resp = self.client.responses.create(
                     model=model_spec,
                     reasoning={"effort":"high"},
                     input=[{
@@ -356,7 +357,7 @@ class InferenceClient:
                 {"type":"image","image":img},
                 {"type":"text","text":prompt}
             ]})
-            return run_inference(self.client, self.processor,
+            return run_inference(self.client, self.processor,self.model_name,
                                       messages=demo_msgs,
                                       temperature=0.0001)
 
@@ -365,31 +366,72 @@ class InferenceClient:
             key = os.getenv("OPENAI_LAB_KEY")
             if key is None:
                 raise RuntimeError("OPENAI_LAB_KEY not set")
-            client = openai.OpenAI(api_key=key, timeout=1000)
+            client = self.client
             demo = []
             for ex_img, ex_prompt, ex_ans in self.fs_examples:
                 ex_b64 = encode(ex_img)
-                demo.append({"role":"user","content":[
-                    {"type":"input_text","text":ex_prompt},
-                    {"type":"input_image","image_url":f"data:image/png;base64,{ex_b64}"}
-                ]})
-                demo.append({"role":"assistant","content":[
-                    {"type":"output_text","text":ex_ans}
-                ]})
-                demo.append({"role":"user","content":[
-                {"type":"input_text","text":"That is correct."}
-                ]})
-            # add our actual query
-            demo.append({"role":"user","content":[
-                {"type":"input_text","text":prompt},
-                {"type":"input_image","image_url":f"data:image/png;base64,{b}"}
-            ]})
-            resp = client.responses.create(
-                model=model_spec,
-                reasoning={"effort":"high"},
-                input=demo
-            )
-            return resp.output_text
+                demo.extend([
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_text",  "text": ex_prompt},
+                            {"type": "input_image", "image_url": f"data:image/png;base64,{ex_b64}"},
+                        ],
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {"type": "output_text", "text": ex_ans},
+                        ],
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_text", "text": "That is correct."},
+                        ],
+                    },
+                ])
+
+            # append our actual query
+            demo.append({
+                "role": "user",
+                "content": [
+                    {"type": "input_text",  "text": prompt},
+                    {"type": "input_image", "image_url": f"data:image/png;base64,{b}"},
+                ],
+            })
+
+            num_total_attempts = self.max_retries
+            for attempt_idx in range(num_total_attempts):
+                try:
+                    resp = self.client.responses.create(
+                        model=self.model_name,
+                        reasoning={"effort": "high"},
+                        input=demo,
+                    )
+                    return resp.output_text
+
+                except (openai.APIError,
+                        openai.APIConnectionError,
+                        openai.RateLimitError) as e:
+
+                    if attempt_idx == num_total_attempts - 1:
+                        raise  # bubble up after last failure
+
+                    # exponential back-off, honouring Retry-After when present
+                    wait_time = self.initial_wait_time * (2 ** attempt_idx)
+                    if isinstance(e, openai.RateLimitError):
+                        ra = getattr(getattr(e, "response", None), "headers", {}).get("retry-after")
+                        if ra and ra.isdigit():
+                            wait_time = max(wait_time, int(ra))
+
+                    print(f"[OpenAI] {e} — retry {attempt_idx+1}/{num_total_attempts} in {wait_time}s")
+                    time.sleep(wait_time)
+                except openai.APIError as e:
+                    print(f"OpenAI API error (few-shot, non-retryable or unhandled for retry): {e}")
+                    raise
+            # This line should ideally not be reached.
+            raise RuntimeError(f"OpenAI API call (few-shot) failed exhaustively after {num_total_attempts} attempts.")
 
         # OPENROUTER few_shot
         usr = {"role":"user","content":[
@@ -842,18 +884,80 @@ def analyze_excess_popular_color(
     print(f"95 % CI                          : [{ci_lo:+.4f}, {ci_hi:+.4f}]")
     print(f"p‑value (H₀: Δ = 0)              : {pval:.4f}")
 
+
+def generate_chain_description_string(num_steps):
+    """
+    Generates a descriptive string for a chain of colored shapes.
+
+    Args:
+        num_steps (int): The number of steps in the chain (len(chain)-1). 
+                         Must be between 1 and 5.
+
+    Returns:
+        str: The formatted descriptive string.
+    """
+    if not 1 <= num_steps <= 5:
+        raise ValueError("Number of steps must be between 1 and 5.")
+
+    items = [
+        ("blue", "triangle"),  # Item 0 (start)
+        ("red", "square"),    # Item 1
+        ("blue", "circle"),    # Item 2
+        ("magenta", "triangle"),  # Item 3
+        ("green", "circle"),   # Item 4
+        ("purple", "square")     # Item 5
+    ]
+
+    path_parts = []
+    
+    # Starting item (item 0)
+    path_parts.append(f"you might start at a {items[0][0]} {items[0][1]}")
+
+    # First step to item 1
+    if num_steps >= 1:
+        path_parts.append(f"then go to a {items[1][0]} {items[1][1]}")
+
+    # Subsequent steps to item 2, 3, ..., num_steps
+    for i in range(2, num_steps + 1):
+        path_parts.append(f"then a {items[i][0]} {items[i][1]}")
+    
+    path_description = ", ".join(path_parts)
+    
+    steps_str = f"{num_steps} step"
+    if num_steps != 1:
+        steps_str += "s"
+        
+    final_color = items[num_steps][0] # The color of the item landed on after num_steps
+    
+    return f"{steps_str}, {path_description}. The answer would be {final_color}."
+
+# Example usage:
+# print(generate_chain_description_string(1))
+# print(generate_chain_description_string(2))
+# print(generate_chain_description_string(3))
+# print(generate_chain_description_string(4))
+# print(generate_chain_description_string(5))
 def main():
     import argparse, os, glob, json, base64, torch, re
     from collections import defaultdict
     from tabulate import tabulate
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--models", nargs="+", default=[
-        "local:qwen",
-        "local:llama",
-        #"openai:o4-mini-2025-04-16",
-        #"openrouter:google/gemini-2.5-pro-preview"
-    ])
+    parser.add_argument("--models", nargs="+", default=
+                    [
+                    #  "openai:o4-mini-2025-04-16",
+                    #  "openai:o3-2025-04-16",
+                    #"openrouter:anthropic/claude-3.7-sonnet:thinking",
+                    #"openrouter:google/gemini-2.5-pro-preview"
+                    # "local:google/gemma-3-27b-it",
+                    # "local:allenai/Molmo-7B-D-0924",
+                    # "local:mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+                    # "local:qwen",
+                    # "local:qwen2.5-vl-32b",
+                    # "local:llama",
+                     "local:OpenGVLab/InternVL3-14B",
+                     "local:microsoft/Phi-4-multimodal-instruct"
+                    ])
     parser.add_argument("--trials", type=str,
                         choices=["chain"],
                         default=["chain"])
@@ -883,9 +987,7 @@ def main():
             )
             prompt = (
                 f"Starting at the {start_pair[1]} {start_pair[0]}, follow the labels for "
-                f"{len(chain)-1} steps. (For instance, in a different example of {len(chain)-1} steps, "
-                "you might start at a blue triangle, then go to a red square, then a blue circle, "
-                "and then end on a gold triangle. The answer would be gold.) "
+                f"{len(chain)-1} steps. (For instance, in a different example of {generate_chain_description_string(len(chain)-1)}) "
                 "After those steps, what color are you on? Answer with the color in curly braces, e.g. {red}."
             )
             ans = f"We start at the {chain[0][1]} {chain[0][0]}"
@@ -946,9 +1048,9 @@ def main():
                             args.grid_size, args.cell_size, args.chain_length
                         )
                         prompt = (
-                            f"Look at the image. Starting at the {spc[1]} {spc[0]}, follow the labels for "
-                            f"{len(chain)-1} steps. (For instance, in a different example of {len(chain)-1} steps, you might start at a blue triangle, then go to a red square, then a blue circle, and then end on a gold triangle. The answer would be gold.) After those steps, what color are you on? "
-                            "Answer with the color in curly braces, e.g {{red}}."
+                            f"Starting at the {spc[1]} {spc[0]}, follow the labels for " # Use spc here
+                            f"{len(chain)-1} steps. (For instance, in a different example of {generate_chain_description_string(len(chain)-1)}) "
+                            "After those steps, what color are you on? Answer with the color in curly braces, e.g. {red}."
                         )
                         meta = {
                             "trial": t, "few_shot": few_flag,
@@ -1003,27 +1105,45 @@ def main():
                         meta = json.load(jf)
                     fs_examples.append((img, meta["prompt"], meta["answer"]))
 
-        # 2) Run inference on saved files
-        for spec, backend, mdl in models:
-            # Use the first few-shot example as the dummy imgpair1 if available,
-            # otherwise fall back to an empty placeholder tuple.
-            demo = fs_examples[0] if fs_examples else (None, None, None)
-            client = InferenceClient(
-                name=backend,
-                imgpair1=demo,
-                fs_examples=fs_examples,
-                api_key=None,
-                openrouter_model=mdl,
-                use_local=(backend=="local"),
-                model_name=mdl,
-                model_path=args.local_model_path
-            )
+        prev_spec = None
+        client = None
 
+        # 2) Run inference per model, reusing `client` if the spec is identical
+        for spec, backend, mdl in models:
+            if spec != prev_spec:
+                # teardown previous client
+                if client is not None:
+                    try:
+                        if hasattr(client, "client") and isinstance(client.client, torch.nn.Module):
+                            client.client.to("cpu")
+                    except:
+                        pass
+                    del client
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+
+                # initialize new client
+                demo = fs_examples[0] if fs_examples else (None, None, None)
+                client = InferenceClient(
+                    name=backend,
+                    imgpair1=demo,
+                    fs_examples=fs_examples,
+                    api_key=None,
+                    openrouter_model=mdl,
+                    use_local=(backend == "local"),
+                    model_name=mdl,
+                    model_path=args.local_model_path
+                )
+                prev_spec = spec
+
+            # for this model, run *all* trials
             for (few_flag,) in settings:
                 title = f"SETTING few_shot={few_flag} | MODEL={spec}"
                 print(f"\n=== {title} ===")
-                # collect examples from disk
-                examples: List[Tuple[dict, str, str, str]] = []  # (info, b64, meta_file, img_file)
+
+                # collect all examples across every trial
+                examples = []
                 for ds_dir in args.load_dataset:
                     for t in args.trials:
                         pattern = os.path.join(ds_dir, f"{t}_fs{int(few_flag)}", "meta_*.json")
@@ -1037,81 +1157,87 @@ def main():
                             examples.append((info, b64, mf, img_file))
 
                 records = []
+                # now iterate every trial in turn
                 for t in args.trials:
                     rec_t = []
                     for info, b64, meta_file, img_file in examples:
-                        if info["trial"]!=t: continue
+                        if info["trial"] != t:
+                            continue
                         raw = client.ask_single(info["prompt"], b64, few_flag)
-                        pred = extract_braced(raw)
-
-                        if t=="chain":
+                        # build `rec` exactly as before:
+                        if t == "chain":
                             label = info["final_color"].lower()
+                            pred  = extract_braced(raw).lower()
                             rec = {
-                                "trial":t, "label":label, "pred":pred.lower(),
-                                "correct":pred.lower()==label,
-                                "start_color":info["start_pair"][1].lower(),
-                                "start_shape":info["start_pair"][0].lower(),
-                                "chain_colors":[c for (_,c) in info["chain"]],
-                                "chain_shapes":[s for (s,_) in info["chain"]],
-                                "majority_freq":max(info["color_counts"].values())/(args.grid_size**2),
-                                "predicted_majority":pred.lower()==max(info["color_counts"], key=info["color_counts"].get)
+                                "trial": t,
+                                "label": label,
+                                "pred": pred,
+                                "correct": pred == label,
+                                "start_color": info["start_pair"][1].lower(),
+                                "start_shape": info["start_pair"][0].lower(),
+                                "chain_colors": [c for (_, c) in info["chain"]],
+                                "chain_shapes": [s for (s, _) in info["chain"]],
+                                "majority_freq": max(info["color_counts"].values())/(args.grid_size**2),
+                                "predicted_majority": pred == max(info["color_counts"], key=info["color_counts"].get)
                             }
                         else:
-                            if t in ("color","shape"):
-                                num = info["target_number"]
-                                pnum = int(re.search(r"\d+",pred).group()) if re.search(r"\d+",pred) else None
-                                rec = {"trial":t,"label":num,"pred":pnum,"correct":pnum==num,"feature":info["target_feat"]}
+                            if t in ("color", "shape"):
+                                num  = info["target_number"]
+                                match = re.search(r"\d+", raw)
+                                pnum = int(match.group()) if match else None
+                                rec = {"trial": t, "label": num, "pred": pnum, "correct": pnum == num, "feature": info["target_feat"]}
                             else:
-                                feat=info["target_feat"]
-                                rec = {"trial":t,"label":feat.lower(),"pred":pred.lower(),
-                                       "correct":pred.lower()==feat.lower(),"feature":feat}
+                                feat    = info["target_feat"]
+                                pred_txt = extract_braced(raw).lower()
+                                rec     = {"trial": t, "label": feat.lower(), "pred": pred_txt, "correct": pred_txt == feat.lower(), "feature": feat}
+
                         rec_t.append(rec)
                         records.append(rec)
+
                         if args.verbose:
-                            record = {
-                                "model":    spec,
-                                "trial":    info["trial"],
+                            print("VERBOSE_RESPONSE:", json.dumps({
+                                "model": spec,
+                                "trial": t,
                                 "meta_file": meta_file,
                                 "img_file": img_file,
-                                "raw":      raw,
-                                "label":    rec["label"],
-                                "pred":     rec.get("pred"),
-                                "correct":  rec["correct"],
-                            }
-                            print("VERBOSE_RESPONSE:", json.dumps(record, indent=2),flush=True)
+                                "raw": raw,
+                                "label": rec["label"],
+                                "pred": rec.get("pred"),
+                                "correct": rec["correct"]
+                            }, indent=2), flush=True)
 
                     if rec_t:
-                        c,n = sum(r["correct"] for r in rec_t), len(rec_t)
+                        c, n = sum(r["correct"] for r in rec_t), len(rec_t)
                         print(f"{t:<20} accuracy: {c}/{n} = {c/n:.2%}")
-                        if t!="chain":
+                        if t != "chain":
                             cats = COLORS if "color" in t else SHAPE_TYPES
-                            analyze_presence_effects(rec_t,cats,"feature",f"{title} {t}")
+                            analyze_presence_effects(rec_t, cats, "feature", f"{title} {t}")
                         else:
-                            analyze_chain_presence_effects(rec_t,title=f"{title} chain presence effects")
-                            chain_color_difficulty(rec_t,title=f"{title} chain color difficulty")
-                            analyze_chain_any_presence(rec_t,title=f"{title} chain any-presence")
+                            analyze_chain_presence_effects(rec_t, title=f"{title} chain presence effects")
+                            chain_color_difficulty(rec_t, title=f"{title} chain color difficulty")
+                            analyze_chain_any_presence(rec_t, title=f"{title} chain any-presence")
+
                 if not records:
-                    print(f"[load-dataset] no examples found for few_shot={few_flag}, MODEL={spec}, probably because it was not present in files, skipping overall analysis.")
+                    print(f"[load-dataset] no examples found for few_shot={few_flag}, MODEL={spec}, skipping overall analysis.")
                     continue
 
                 total = len(records)
-                corr = sum(r["correct"] for r in records)
+                corr  = sum(r["correct"] for r in records)
                 print(f"{title} overall accuracy: {corr}/{total} = {corr/total:.2%}")
 
-                # Excess popular-color analysis
                 analyze_excess_popular_color(records, title=f"{title} excess popular color")
 
-            # teardown
+        # teardown final client
+        if client is not None:
             try:
-                if hasattr(client,"client") and isinstance(client.client,torch.nn.Module):
+                if hasattr(client, "client") and isinstance(client.client, torch.nn.Module):
                     client.client.to("cpu")
             except:
                 pass
-            del client
-            if torch.cuda.is_available(): torch.cuda.empty_cache()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         return
-
     # LIVE-GENERATION
     for spec, backend, mdl in models:
         demo = fs_examples[0]
@@ -1138,10 +1264,10 @@ def main():
                             args.grid_size,args.cell_size,args.chain_length
                         )
                         b64=encode(img)
-                        prompt=(
-                            f"Look at the image. Starting at the {spc[1]} {spc[0]}, follow the labels for "
-                            f"{len(chain)-1} steps. (For instance, in a different example of {len(chain)-1} steps, you might start at a blue triangle, then go to a red square, then a blue circle, and then end on a gold triangle. The answer would be gold.) After those steps, what color are you on? "
-                            "Answer with the color in curly braces, e.g {{red}}."
+                        prompt = (
+                            f"Starting at the {spc[1]} {spc[0]}, follow the labels for " # Use spc here
+                            f"{len(chain)-1} steps. (For instance, in a different example of {generate_chain_description_string(len(chain)-1)}) "
+                            "After those steps, what color are you on? Answer with the color in curly braces, e.g. {red}."
                         )
                         raw=client.ask_single(prompt,b64,few_flag)
                         pred=extract_braced(raw).lower()

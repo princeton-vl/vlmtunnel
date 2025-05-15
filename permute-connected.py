@@ -33,10 +33,10 @@ Usage
     python permute-connected.py --models openai --num 10 --few-shot --verbose
 """
 
-import os, random, math, base64, re, copy, argparse, requests
+import os, random, math, base64, re, copy, argparse, requests, gc
 from collections import deque
 from typing import Optional, List, Tuple
-
+import math
 from PIL import Image, ImageDraw
 from tabulate import tabulate
 import numpy as np
@@ -89,12 +89,12 @@ PROB_SCALE                     = 0.15
 PROB_RESHAPE                   = 0.05
 
 RESCALE_MIN                    = 0.1
-RESCALE_MAX                    = 0.3
+RESCALE_MAX                    = 0.33
 NO_MIN_TRANSLATE_PX            = 15
 NO_MAX_TRANSLATE_PX            = 30
 NO_MIN_ROT                     = -math.pi/5
 NO_MAX_ROT                     =  math.pi/5
-JITTER_MIN_ROT                 = math.radians(6)          # ≥8°
+JITTER_MIN_ROT                 = math.radians(6)          # ≥6°
 
 LABEL_HEIGHT                   = 30
 BAR_WIDTH                      = 10
@@ -193,8 +193,10 @@ def generate_two_shot_examples(
 
         # Optional distractors
         if with_distractors:
-            R = max(abs(dx) + compute_shape_radius(s)
-                    for (dx, _), s in zip(offs2, shapes))
+            R = max(
+                math.hypot(dx, dy) + compute_shape_radius(s)
+                for (dx, dy), s in zip(offs2, shapes)
+            )
             img2 = _add_distractors(
                 img2, (cx, cy), R, canvas,
                 allow_overlap=allow_distractor_overlap
@@ -887,8 +889,10 @@ def _run_trial(rid, canvas, odir, client,
 
     # 4) Distractors
     if ENABLE_DISTRACTORS:
-        R = max(abs(dx)+compute_shape_radius(s)
-                for (dx,_),s in zip(offs2 if truth=="no" else offs, shapes))
+        R = max(
+            math.hypot(dx, dy) + compute_shape_radius(s)
+            for (dx, dy), s in zip(offs2, shapes)
+        )
         img2 = _add_distractors(
             img2, (cx2, cy2), R, canvas,
             allow_overlap=DISTRACTOR_CAN_OVERLAP
@@ -1458,7 +1462,22 @@ def main():
     global ENABLE_DISTRACTORS, DISTRACTOR_CAN_OVERLAP, FEW_SHOT
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--models", nargs="+", default=["local:llama"])
+    #ap.add_argument("--models", nargs="+", default=["local:OpenGVLab/InternVL3-14B"])
+    ap.add_argument("--models", nargs="+", default=[
+                #    "openrouter:anthropic/claude-3.7-sonnet:thinking",
+                #    "openrouter:google/gemini-2.5-pro-preview",
+                #    "openai:o4-mini-2025-04-16",
+                    #"openai:o3-2025-04-16",
+                   # "local:google/gemma-3-27b-it",
+                    # "local:allenai/Molmo-7B-D-0924",
+                    #  "local:mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+                    #"local:qwen",
+                    #"local:llama",
+                    #"local:microsoft/Phi-4-multimodal-instruct",
+                    "local:OpenGVLab/InternVL3-14B",
+                    "local:qwen2.5-vl-32b",
+
+                                                    ])
     ap.add_argument("--num", type=int, default=5, help="Examples per trial")
     ap.add_argument("--verbose", action="store_true")
     ap.add_argument("--model_path", type=str, default=None)
@@ -1480,7 +1499,7 @@ def main():
         models.append((m, backend.lower(), spec))
 
     # which trials to run
-    TRIALS = (2,9)
+    TRIALS = (3,)
 
     # few-shot / distractor settings
     if args.all_settings:
@@ -1665,6 +1684,7 @@ def main():
                             pass
                         # Delete the client object and clear CUDA cache
                         del client
+                        gc.collect()
                         torch.cuda.empty_cache()
                     if backend == "local":
                         client = InferenceClient("local", yes_pair, no_pair,
@@ -1693,6 +1713,7 @@ def main():
                                 "no_distractors": no_dist,
                                 "img1": ex["img1_path"],
                                 "img2": ex["img2_path"],
+                                "raw_out": raw_out,
                                 "answer": ans,
                                 "truth": ex["truth"]
                             }

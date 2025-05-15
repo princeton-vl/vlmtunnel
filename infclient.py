@@ -13,15 +13,24 @@ from typing import Optional, Sequence, Union, List
 from PIL import Image
 import torch
 
+
+from transformers import Qwen2_5_VLForConditionalGeneration  # NEW
+from qwen_vl_utils import process_vision_info                 # NEW
+
 from transformers import (
     AutoProcessor,
     AutoModelForCausalLM,
     AutoTokenizer,
-    Pix2StructForConditionalGeneration,
     Pix2StructProcessor,
     GenerationConfig,
+    get_scheduler,
+    AutoModelForImageTextToText,
+    Pix2StructForConditionalGeneration, # Pix2StructProcessor is already here
+    AutoModel,
+    Gemma3ForConditionalGeneration  # <-- Add this import
 )
 
+from transformers import GenerationConfig
 
 import numpy as np
 import torchvision.transforms as T
@@ -120,10 +129,9 @@ class LocalFetcher:
         # Imports from training modules.
         from config import TrainConfig, FSDPConfig
         from utilities.utils import get_policies, freeze_visual_only, save_fsdp_model_checkpoint_full,  load_model_checkpoint_shared_shard, apply_fsdp_checkpointing
-        from transformers import AutoProcessor, get_scheduler, AutoTokenizer
         from factories import get_model_implementation_from_path, get_authoritative_model_path
         if not model_path:
-            if model_name == "molmo":
+            if "molmo" in model_name.lower():
                 self.processor = AutoProcessor.from_pretrained(
                 'allenai/Molmo-7B-D-0924',
                 trust_remote_code=True,
@@ -137,18 +145,37 @@ class LocalFetcher:
                     'allenai/Molmo-7B-D-0924',
                     trust_remote_code=True,
                     torch_dtype='auto',
-                        device_map={'': self.device},
-                ).eval()
+                    device_map='auto'
+                    ).eval()
                
             elif model_name == "pix2struct":
-                from transformers import Pix2StructForConditionalGeneration, Pix2StructProcessor
 
                 self.client = Pix2StructForConditionalGeneration.from_pretrained("google/pix2struct-ai2d-base")
                 self.processor = Pix2StructProcessor.from_pretrained("google/pix2struct-ai2d-base")
                 self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 self.client = self.client.to(self.device).eval()
+            elif "mistral" in model_name.lower():
+                hf_id = model_name  # e.g. "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+
+                # load tokenizer & processor
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    hf_id, trust_remote_code=True, use_auth_token=True
+                )
+                self.processor = AutoProcessor.from_pretrained(
+                    hf_id, trust_remote_code=True, use_auth_token=True
+                )
+
+                # load the image-to-text model in fp16 on GPU
+                self.client = AutoModelForImageTextToText.from_pretrained(
+                    hf_id,
+                    trust_remote_code=True,
+                    use_auth_token=True,
+                    torch_dtype=torch.float16,
+                    device_map="auto",
+                ).eval()
+                self.device = next(self.client.parameters()).device
+            
             elif "phi-4" in model_name.lower():
-                from transformers import AutoProcessor, AutoModelForCausalLM
 
                 phi_path = model_name
                 # load processor + base model in FP16
@@ -175,9 +202,23 @@ class LocalFetcher:
                 self.client = self.client.half()  # ensure all weights & activations are FP16
                 self.device = next(self.client.parameters()).device
                 # ─── Magma-8B branch ──────────────────────────────────────────────────────
+            
+            elif "qwen2.5-vl-32b" in model_name.lower() or "qwen-2.5-vl-32b" in model_name.lower():
+                hf_id = "Qwen/Qwen2.5-VL-32B-Instruct"
+
+                # 1. processor (optionally pass min_pixels / max_pixels here)
+                self.processor = AutoProcessor.from_pretrained(hf_id)
+
+                # 2. model  (use attn_implementation="flash_attention_2" if you like)
+                self.client = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                    hf_id,
+                    torch_dtype="auto",
+                    device_map="auto"
+                ).eval()
+
+                self.device = next(self.client.parameters()).device
             elif "magma" in model_name.lower():
                 # ─── Magma-8B Multimodal support ──────────────────────────────────────
-                from transformers import AutoModelForCausalLM, AutoProcessor
                 dtype = torch.bfloat16
 
                 # load model & processor
@@ -197,8 +238,7 @@ class LocalFetcher:
             
             
             
-            if "internvl" in model_name.lower():
-                from transformers import AutoModel, AutoTokenizer
+            elif "internvl" in model_name.lower():
                 self.client = AutoModel.from_pretrained(
                     model_name,
                     torch_dtype=torch.bfloat16,
@@ -214,6 +254,43 @@ class LocalFetcher:
                 self.processor = None
                 self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 self.client.tokenizer = self.tokenizer
+            elif "gemma" in model_name.lower():
+                model_id_gemma = model_name # e.g., "google/gemma-3-27b-it"
+                
+                print(f"INFO [GemmaLoader]: Initializing Gemma model: {model_id_gemma}", file=sys.stderr)
+                print(f"INFO [GemmaLoader]: Loading processor for {model_id_gemma}", file=sys.stderr)
+                self.processor = AutoProcessor.from_pretrained(model_id_gemma)
+                
+                print(f"INFO [GemmaLoader]: Loading model {model_id_gemma} with device_map='auto' and torch_dtype=torch.bfloat16", file=sys.stderr)
+                self.client = Gemma3ForConditionalGeneration.from_pretrained(
+                    model_id_gemma,
+                    device_map="auto",        # Handles multi-GPU distribution and device placement
+                    torch_dtype=torch.bfloat16,
+                    attn_implementation="eager"
+                ).eval()
+                
+                # self.device is for reference; model parts are on devices determined by device_map.
+                # For operations, use model.device or tensor.to(model.device).
+                if hasattr(self.client, 'device') and self.client.device is not None:
+                    self.device = self.client.device
+                else:
+                    # Fallback: if model.device is not set, infer from a parameter.
+                    # This should generally not be needed with device_map="auto".
+                    try:
+                        self.device = next(self.client.parameters()).device
+                    except StopIteration: # Model has no parameters (empty)
+                        print("WARNING [GemmaLoader]: Model has no parameters. Defaulting device.", file=sys.stderr)
+                        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                
+                print(f"INFO [GemmaLoader]: Gemma model {model_id_gemma} loaded.", file=sys.stderr)
+                print(f"INFO [GemmaLoader]: Effective model device (self.device): {self.device}", file=sys.stderr)
+                if hasattr(self.client, 'config') and self.client.config is not None :
+                    print(f"INFO [GemmaLoader]: Model config torch_dtype: {self.client.config.torch_dtype}", file=sys.stderr)
+                try:
+                    param_dtype = next(self.client.parameters()).dtype
+                    print(f"INFO [GemmaLoader]: Actual dtype of a model parameter: {param_dtype}", file=sys.stderr)
+                except StopIteration:
+                    print("INFO [GemmaLoader]: Could not retrieve parameter dtype (model might be empty or on meta device before dispatch).", file=sys.stderr)
             
             else:
                 hf_id = get_authoritative_model_path(model_name)
@@ -223,7 +300,6 @@ class LocalFetcher:
                 self.processor = wrapped_pretrained.get_processor()
                 self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 self.client = self.client.to(self.device).eval()
-            
         else:       
             train_config = TrainConfig()
             fsdp_config = FSDPConfig()
@@ -294,6 +370,7 @@ def run_inference(
         if images is not None:
             img_list = list(images) if isinstance(images, (list, tuple)) else [images]
 
+    
     # 2️⃣  Pix2Struct branch --------------------------------------------------
     if "pix2struct" in model_name.lower():
         if not img_list:
@@ -307,29 +384,216 @@ def run_inference(
         )
         return processor.decode(out_ids[0], skip_special_tokens=True)
 
-    # 3️⃣  Molmo branch -------------------------------------------------------
+    elif "mistral" in model_name.lower():
+        # build the full prompt via the processor’s chat template
+        prompt = processor.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            tokenize=False
+        )
+
+        # prepare inputs (with or without images)
+        inputs = processor(
+            text=prompt,
+            images=img_list,
+            return_tensors="pt"
+        )
+
+        # move tensors to the model's device; cast only floats to the model's dtype
+        device = next(model.parameters()).device
+        target_dtype = next(model.parameters()).dtype
+        for k, v in inputs.items():
+            if not isinstance(v, torch.Tensor):
+                continue
+            v = v.to(device)
+            if v.dtype.is_floating_point:
+                v = v.to(target_dtype)
+            inputs[k] = v
+
+        # generate with sampling enabled so temperature is respected
+        out_ids = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=True,
+            temperature=temperature,
+            **generate_kwargs,
+        )
+
+        # strip off prompt tokens and decode only the new ones
+        seq_len = inputs["input_ids"].shape[1]
+        gen_ids = out_ids[0, seq_len:]
+        return processor.decode(gen_ids, skip_special_tokens=True).strip()
+    
+    
+    
     elif "molmo" in model_name.lower():
-        if not img_list:
-            raise ValueError("Molmo needs at least one image.")
-        proc_inputs = processor.process(images=img_list, text=prompt)
-        # Make a batch dimension and move to the model’s device
+        # Setting to control behavior for single-image Molmo.
+        # If True, uses only the turn containing the last image and that single image.
+        # If False (default), uses all messages (with role merging) and all images from the original img_list.
+        molmo_use_only_last_image_turn_strict = True # Default
+
+        active_messages_to_process = messages
+        # img_list is the global list of all images from run_inference's initial parsing
+        active_img_list_to_process = img_list 
+
+        if molmo_use_only_last_image_turn_strict:
+            last_msg_idx_with_img = -1
+            the_last_image_obj = None
+
+            # Iterate messages in reverse to find the last one with an actual image object
+            for i in range(len(messages) - 1, -1, -1):
+                current_message_node = messages[i]
+                current_message_content = current_message_node.get("content")
+                if isinstance(current_message_content, list):
+                    for part in current_message_content:
+                        # Ensure it's an image part and the 'image' key holds a loaded PIL.Image object
+                        if part.get("type") in ("image", "input_image", "image_url") and isinstance(part.get("image"), Image.Image):
+                            last_msg_idx_with_img = i
+                            the_last_image_obj = part.get("image")
+                            break # Found the last image in this message
+                if last_msg_idx_with_img != -1:
+                    break # Found the overall last message with an image
+            
+            if last_msg_idx_with_img != -1:
+                # Strict mode: use only the single turn that contained the last image
+                active_messages_to_process = [messages[last_msg_idx_with_img]]
+                active_img_list_to_process = [the_last_image_obj] # List containing only the last image
+            else:
+                # Strict mode active, but no image was found in messages.
+                # Process all text from original messages, but ensure no images are passed.
+                active_messages_to_process = messages 
+                active_img_list_to_process = [] # Explicitly no images
+        
+        # Build _conversation_for_template using the determined active_messages_to_process
+        _conversation_for_template = []
+        for msg in active_messages_to_process:
+            current_turn_text_parts = []
+            raw_content = msg.get("content")
+
+            if isinstance(raw_content, list):
+                for part in raw_content:
+                    if part.get("type") in ("text", "input_text"):
+                        current_turn_text_parts.append(part["text"])
+            elif isinstance(raw_content, str):
+                current_turn_text_parts.append(raw_content)
+            
+            current_content_str = " ".join(current_turn_text_parts).strip()
+            current_role = msg.get("role")
+
+            if _conversation_for_template and _conversation_for_template[-1]["role"] == current_role:
+                if current_content_str: 
+                    if _conversation_for_template[-1]["content"]:
+                        _conversation_for_template[-1]["content"] += "\n" + current_content_str
+                    else:
+                        _conversation_for_template[-1]["content"] = current_content_str
+            else:
+                _conversation_for_template.append({
+                    "role": current_role,
+                    "content": current_content_str
+                })
+
+        templated_prompt_str = processor.tokenizer.apply_chat_template(
+            conversation=_conversation_for_template,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        
+        # Use active_img_list_to_process which is either all images, the single last image, or empty.
+        proc_inputs = processor.process(images=active_img_list_to_process, text=templated_prompt_str)
+        
         device = next(model.parameters()).device
         for k, v in proc_inputs.items():
             if isinstance(v, torch.Tensor):
                 proc_inputs[k] = v.unsqueeze(0).to(device)
+
+        plen = proc_inputs["input_ids"].shape[1]
+        max_pos = getattr(model.config, "max_position_embeddings", 4096)
+        total_max = min(plen + max_new_tokens, max_pos)
+
         gen_cfg = GenerationConfig(
             max_new_tokens=max_new_tokens,
-            stop_strings="<|endoftext|>",
+            max_length=total_max
         )
+
         out = model.generate_from_batch(
-            proc_inputs, gen_cfg, tokenizer=processor.tokenizer
+            proc_inputs,
+            gen_cfg,
+            tokenizer=processor.tokenizer
         )
-        plen   = proc_inputs["input_ids"].size(1)
+
         tokens = out[0, plen:]
         return processor.tokenizer.decode(tokens, skip_special_tokens=True)
-        # 4️⃣  Phi-4 Multimodal branch -----------------------------------------
-    # ——— Phi-4-Multimodal branch ——————————————————————————————
-        # ─── Magma-8B branch ──────────────────────────────────────────────────────
+    elif "qwen" in model_name.lower() and "vl" in model_name.lower():
+        # Expect: messages already built exactly like in the tutorial
+        if messages is None:
+            raise ValueError("Qwen-2.5-VL-32B needs `messages` structured as "
+                             "[{'role':'user','content':[{'type':'image',...},{'type':'text',...}]}].")
+
+        # Build text prompt with the model’s chat template
+        prompt_text = processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+
+        # Extract images/videos from messages → helper bundled with Qwen
+        image_inputs, video_inputs = process_vision_info(messages)
+
+        # Tokenise
+        inputs = processor(
+            text=[prompt_text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt"
+        ).to(model.device)
+
+        # Generate
+        gen_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+        trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, gen_ids)]
+        out_text = processor.batch_decode(
+            trimmed,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False
+        )
+        return out_text[0].strip()
+    elif "internvl" in model_name.lower():
+        #
+        # 1.  Build flat prompt string (no special template is required; InternVL
+        #     treats everything up to the first <image> token as text).
+        #
+        prompt_text = prompt               # <- computed in the parsing block above
+        #
+        # 2.  Convert (the last) PIL image → pixel tiles expected by InternVL.
+        #     If you pass two images, only the last one is used (mirrors their demo).
+        #
+        pixel_values = None
+        if img_list:
+            base_img   = img_list[-1]                      # use last image
+            tiles      = dynamic_preprocess(base_img,
+                                            image_size=448,
+                                            use_thumbnail=True,
+                                            max_num=12)
+            transform  = build_transform(448)
+            pixel_vals = [transform(t) for t in tiles]     # list[3×448×448]
+            pixel_values = torch.stack(pixel_vals, dim=0)  # (N,3,448,448)
+            pixel_values = pixel_values.to(model.device, torch.bfloat16)
+
+        #
+        # 3.  Call InternVL’s built-in chat helper.
+        #
+        tokenizer = getattr(model, "tokenizer", None)
+        if tokenizer is None:
+            raise RuntimeError("InternVL model must have `.tokenizer` attribute.")
+
+        gen_cfg = dict(max_new_tokens=max_new_tokens,
+                        do_sample      = temperature > 0,
+                        temperature    = temperature)
+
+        response = model.chat(tokenizer,
+                                pixel_values,
+                                prompt_text,
+                                gen_cfg)
+        return response.strip()
+
     elif "magma" in model_name.lower():
         # build conversation list
         convs = [
@@ -393,60 +657,105 @@ def run_inference(
         gen_ids = out_ids[:, start:]
         return processor.decode(gen_ids[0], skip_special_tokens=True).strip()
 
-    
-    elif "internvl" in model_name.lower():
-        if messages is None:
-            raise ValueError("InternVL requires `messages` with embedded images/text.")
+    elif "gemma" in model_name.lower():
+        # This branch assumes `messages` is already correctly structured from the
+        # main parsing block of run_inference (lines 199-229 of your full script)
+        # Specifically, `messages` should be a list of dicts, where image parts contain PIL.Image objects.
 
-        # 1) extract raw PIL images from messages
-        imgs = []
-        for msg in messages:
-            for part in msg["content"]:
-                if part.get("type") in ("image", "input_image") and isinstance(part.get("image"), Image.Image):
-                    imgs.append(part["image"])
+        if not messages: # Initial check on the raw input messages
+            raise ValueError("Gemma [Tutorial]: Input 'messages' list is empty.")
 
-        if not imgs:
-            raise ValueError("InternVL needs at least one image in messages.")
+        # --- START: Logic to merge consecutive messages of the same role ---
+        merged_intermediate_messages = []
+        if messages: # Proceed only if there are messages to process
+            # Start with the first message as the base for a potential merge
+            current_processing_message = {
+                "role": messages[0]["role"],
+                "content": list(messages[0].get("content", [])) # Ensure content is a new list
+            }
 
-        # 2) prepare tiles & num_patches
-        all_tiles = []
-        num_patches_list = []
-        for img in imgs:
-            tiles = dynamic_preprocess(img, image_size=448, use_thumbnail=False, max_num=12)
-            num_patches_list.append(len(tiles))
-            all_tiles.extend(tiles)
+            for i in range(1, len(messages)):
+                next_message = messages[i]
+                next_message_content = list(next_message.get("content", []))
 
-        # 3) transform & cast
-        transform = build_transform(input_size=448)
-        tensor = torch.stack([transform(tile) for tile in all_tiles])  # float32
-        pixel_values = tensor.to(model.device, dtype=next(model.parameters()).dtype)
+                if next_message["role"] == current_processing_message["role"]:
+                    # Same role, extend the content of the current_processing_message
+                    current_processing_message["content"].extend(next_message_content)
+                else:
+                    # Different role, so the current_processing_message is complete
+                    merged_intermediate_messages.append(current_processing_message)
+                    # Start a new message to process
+                    current_processing_message = {
+                        "role": next_message["role"],
+                        "content": next_message_content
+                    }
+            
+            # Append the last processed message (which might be the only one if len(messages) == 1)
+            if current_processing_message:
+                merged_intermediate_messages.append(current_processing_message)
+        # --- END: Merging logic ---
 
-        # 4) build the internvl‐style prompt from messages
-        prompt_lines = []
-        for msg in messages:
-            if msg["role"] == "user":
-                for part in msg["content"]:
-                    if part.get("type") in ("image", "input_image"):
-                        prompt_lines.append("<image>\n")
-                    elif part.get("type") in ("text", "input_text"):
-                        prompt_lines.append(part["text"] + "\n")
-            elif msg["role"] == "assistant":
-                for part in msg["content"]:
-                    if part.get("type") in ("text", "input_text"):
-                        prompt_lines.append(part["text"] + "\n")
-        internvl_prompt = "".join(prompt_lines).strip()
+        # Now, use `merged_intermediate_messages` for further processing (e.g., adding system prompt)
+        
+        # Ensure system prompt if user messages exist (common pattern)
+        # This logic now operates on the potentially merged messages
+        has_user_message = any(msg.get("role") == "user" for msg in merged_intermediate_messages)
+        if has_user_message and not any(msg.get("role") == "system" for msg in merged_intermediate_messages):
+            # Create a new list to avoid modifying the original `messages` list if it's from a loop
+            # Place system prompt at the beginning.
+            final_processed_messages = [{"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]}] + merged_intermediate_messages
+        else:
+            final_processed_messages = merged_intermediate_messages
+        
+        # After merging and system prompt addition, check if the list for the model is empty.
+        # This is a sanity check. If original `messages` was not empty, `final_processed_messages` shouldn't be either.
+        if not final_processed_messages and messages:
+            raise ValueError("Gemma: Message processing resulted in an empty list unexpectedly.")
+        elif not final_processed_messages: # If original messages was also empty, this is caught by the first check.
+            # If somehow we reach here with final_processed_messages being empty (e.g. only system prompt and no user messages),
+            # and the model requires user messages, apply_chat_template might still fail.
+            # For now, we rely on the initial `if not messages:` or subsequent processor errors.
+            pass
 
-        # 5) generate
-        generation_config = dict(max_new_tokens=max_new_tokens, temperature=temperature, **generate_kwargs)
-        response = model.chat(
-            model.tokenizer,
-            pixel_values,
-            internvl_prompt,
-            generation_config,
-            history=None,
-            num_patches_list=num_patches_list
-        )
-        return response
+
+        # Step 1: Tokenize and prepare inputs dict, then global .to() like tutorial
+        # This single .to() call will move all tensors to model.device.
+        # For dtypes: float32 tensors (like pixel_values) become bfloat16.
+        # Integer tensors (like input_ids, attention_mask from processor) REMAIN integer type.
+        inputs = processor.apply_chat_template(
+            final_processed_messages, # Use the fully processed messages
+            add_generation_prompt=True,
+            tokenize=True,
+            return_dict=True,
+            return_tensors="pt"
+        ).to(model.device, dtype=torch.bfloat16) # model.device comes from LocalFetcher
+
+        # Minimal check for critical dtypes after the .to() call
+        # This confirms our understanding of how .to() works.
+        if inputs["input_ids"].dtype == torch.bfloat16: # This should NOT happen
+            raise RuntimeError("CRITICAL ERROR: input_ids became bfloat16. This should not happen with tensor.to() on an int tensor.")
+        if "attention_mask" in inputs and inputs["attention_mask"].dtype == torch.bfloat16: # This should also NOT happen
+            raise RuntimeError("CRITICAL ERROR: attention_mask became bfloat16. This should not happen with tensor.to() on an int tensor.")
+        if "pixel_values" in inputs and inputs["pixel_values"].dtype != torch.bfloat16:
+                print(f"WARNING [GemmaRun Tutorial]: pixel_values is {inputs['pixel_values'].dtype}, not bfloat16, after .to() call. This is unexpected if it was float32.", file=sys.stderr)
+
+        # Step 2: Generate (simplified like tutorial, using **inputs)
+        input_len = inputs["input_ids"].shape[-1]
+        
+        with torch.inference_mode():
+            # Spread the entire `inputs` dictionary from the processor.
+            # Use `max_new_tokens` from the function signature. `do_sample=False` as per tutorial.
+            generation_output = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens, 
+                do_sample=False
+            )
+            
+        generated_ids = generation_output[0][input_len:]
+
+        # Step 3: Decode
+        decoded_text = processor.decode(generated_ids, skip_special_tokens=True)
+        return decoded_text.strip()
     
     
     elif "phi-4" in model_name.lower():
@@ -502,7 +811,8 @@ def run_inference(
         return processor.decode(gen_ids[0], skip_special_tokens=True).strip()
     
     
-    # 4️⃣  Generic chat vision branch ----------------------------------------
+       # ── Generic chat-vision branch ───────────────────────────────────────────
+# 4️⃣  Generic chat vision branch ----------------------------------------
     if messages is None:
         stub = [{"type":"image"} for _ in img_list]
         stub.append({"type":"text","text": prompt})
