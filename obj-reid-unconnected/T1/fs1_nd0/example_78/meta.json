@@ -1,0 +1,63 @@
+{
+  "trial": 1,
+  "few_shot": true,
+  "enable_distractors": true,
+  "allow_distractor_overlap": false,
+  "truth": "no",
+  "global_affine": [
+    2.154156598481678,
+    0.5074120845651804,
+    256,
+    256,
+    256,
+    256
+  ],
+  "transforms": [
+    "scale",
+    "translate"
+  ],
+  "jit_attrs": [
+    {
+      "type": "square",
+      "color": "magenta"
+    },
+    {
+      "type": "circle",
+      "color": "red"
+    }
+  ],
+  "shapes": [
+    {
+      "type": "square",
+      "color": "magenta",
+      "angle": 0,
+      "z": 0,
+      "width": 64.74389833618143,
+      "height": 64.74389833618143
+    },
+    {
+      "type": "square",
+      "color": "red",
+      "angle": 0,
+      "z": 1,
+      "width": 95.35781030697304,
+      "height": 95.35781030697304
+    },
+    {
+      "type": "circle",
+      "color": "red",
+      "angle": 0,
+      "z": 2,
+      "size": 99.82095599935994
+    },
+    {
+      "type": "triangle",
+      "color": "green",
+      "angle": 0,
+      "z": 3,
+      "size": 65.81839712142985
+    }
+  ],
+  "concat": false,
+  "prompt": "The first image shows an object made of geometric shapes, which together form an object. Does this SAME object appear in the second image up to a rigid translation, rotation, and scale of the ENTIRE object as a whole? Respond with {yes} or {no}. There may be extra shapes in Image 2 that are not part of the original object; as long as the object from Image 1 is present, the answer is yes even if there are other shapes present."
+}

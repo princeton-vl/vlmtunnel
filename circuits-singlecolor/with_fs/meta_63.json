@@ -1,0 +1,73 @@
+{
+  "query_port": 3,
+  "correct_comp": "C3",
+  "mapping": {
+    "6": "C1",
+    "10": "C9",
+    "1": "C8",
+    "9": "C6",
+    "3": "C3",
+    "8": "C3",
+    "2": "C5",
+    "4": "C5",
+    "7": "C4"
+  },
+  "winfo": {
+    "6": {
+      "length": 466.6904755831214,
+      "euclid_dist": 365.8742953529258,
+      "crossings": 0,
+      "color": "red"
+    },
+    "10": {
+      "length": 490.0457786608984,
+      "euclid_dist": 478.8621931203172,
+      "crossings": 1,
+      "color": "red"
+    },
+    "1": {
+      "length": 278.6000717874997,
+      "euclid_dist": 227.1079038695043,
+      "crossings": 1,
+      "color": "red"
+    },
+    "9": {
+      "length": 325.2691193458119,
+      "euclid_dist": 233.80333616097099,
+      "crossings": 0,
+      "color": "red"
+    },
+    "3": {
+      "length": 310.4434210358308,
+      "euclid_dist": 300.70749907509787,
+      "crossings": 2,
+      "color": "red"
+    },
+    "8": {
+      "length": 320.3893892470373,
+      "euclid_dist": 314.6823795511913,
+      "crossings": 1,
+      "color": "red"
+    },
+    "2": {
+      "length": 327.3922715599296,
+      "euclid_dist": 232.95707759155977,
+      "crossings": 3,
+      "color": "red"
+    },
+    "4": {
+      "length": 325.2691193458119,
+      "euclid_dist": 261.29676614914314,
+      "crossings": 1,
+      "color": "red"
+    },
+    "7": {
+      "length": 466.6904755831214,
+      "euclid_dist": 374.94532934815976,
+      "crossings": 7,
+      "color": "red"
+    }
+  },
+  "prompt": "Which component does the wire from port 3 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

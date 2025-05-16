@@ -1,0 +1,72 @@
+{
+  "trial": 1,
+  "few_shot": true,
+  "enable_distractors": true,
+  "allow_distractor_overlap": false,
+  "truth": "no",
+  "global_affine": [
+    0.986850852146528,
+    0.41890371625044975,
+    256,
+    256,
+    256,
+    256
+  ],
+  "transforms": [
+    "scale",
+    "rotate"
+  ],
+  "jit_attrs": [
+    {
+      "type": "square",
+      "color": "green"
+    },
+    {
+      "type": "oval",
+      "color": "orange"
+    }
+  ],
+  "shapes": [
+    {
+      "type": "oval",
+      "color": "orange",
+      "angle": 0,
+      "z": 0,
+      "width": 60.0972217165256,
+      "height": 73.75521032783317
+    },
+    {
+      "type": "square",
+      "color": "purple",
+      "angle": 0,
+      "z": 1,
+      "width": 79.42762651170167,
+      "height": 79.42762651170167
+    },
+    {
+      "type": "oval",
+      "color": "blue",
+      "angle": 0,
+      "z": 2,
+      "width": 68.12386231474775,
+      "height": 93.4554391099898
+    },
+    {
+      "type": "line",
+      "color": "purple",
+      "angle": 0,
+      "z": 3,
+      "size": 76.78265487004472
+    },
+    {
+      "type": "square",
+      "color": "green",
+      "angle": 0,
+      "z": 4,
+      "width": 62.49855681036653,
+      "height": 62.49855681036653
+    }
+  ],
+  "concat": false,
+  "prompt": "The first image shows an object made of geometric shapes, which together form an object. Does this SAME object appear in the second image up to a rigid translation, rotation, and scale of the ENTIRE object as a whole? Respond with {yes} or {no}. There may be extra shapes in Image 2 that are not part of the original object; as long as the object from Image 1 is present, the answer is yes even if there are other shapes present."
+}

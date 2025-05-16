@@ -1,0 +1,37 @@
+{
+  "trial": "chain",
+  "few_shot": true,
+  "start_pair": [
+    "triangle",
+    "lime"
+  ],
+  "final_color": "blue",
+  "chain": [
+    [
+      "triangle",
+      "lime"
+    ],
+    [
+      "triangle",
+      "red"
+    ],
+    [
+      "square",
+      "blue"
+    ]
+  ],
+  "color_counts": {
+    "cyan": 2,
+    "purple": 3,
+    "orange": 3,
+    "magenta": 1,
+    "blue": 3,
+    "red": 3,
+    "lime": 3,
+    "pink": 2,
+    "yellow": 2,
+    "gray": 1,
+    "green": 2
+  },
+  "prompt": "Starting at the lime triangle, follow the labels for 2 steps. (For instance, in a different example of 2 steps, you might start at a blue triangle, then go to a red square, then a blue circle. The answer would be blue.) After those steps, what color are you on? Answer with the color in curly braces, e.g. {red}."
+}

@@ -1,0 +1,73 @@
+{
+  "query_port": 9,
+  "correct_comp": "C4",
+  "mapping": {
+    "5": "C7",
+    "7": "C8",
+    "6": "C2",
+    "3": "C4",
+    "9": "C4",
+    "4": "C5",
+    "10": "C1",
+    "2": "C1",
+    "8": "C6"
+  },
+  "winfo": {
+    "5": {
+      "length": 465.98416688983593,
+      "euclid_dist": 348.81083698761427,
+      "crossings": 0,
+      "color": "green"
+    },
+    "7": {
+      "length": 325.98374768842,
+      "euclid_dist": 293.9200571584049,
+      "crossings": 1,
+      "color": "green"
+    },
+    "6": {
+      "length": 468.81283885476796,
+      "euclid_dist": 330.12270446002344,
+      "crossings": 0,
+      "color": "green"
+    },
+    "3": {
+      "length": 353.5533905932738,
+      "euclid_dist": 333.01651610693426,
+      "crossings": 0,
+      "color": "green"
+    },
+    "9": {
+      "length": 385.3742265123807,
+      "euclid_dist": 281.83150994876354,
+      "crossings": 2,
+      "color": "green"
+    },
+    "4": {
+      "length": 236.88226347731194,
+      "euclid_dist": 181.077331546497,
+      "crossings": 0,
+      "color": "green"
+    },
+    "10": {
+      "length": 481.54049845814893,
+      "euclid_dist": 357.6548615634911,
+      "crossings": 0,
+      "color": "green"
+    },
+    "2": {
+      "length": 396.687543582184,
+      "euclid_dist": 391.0460330958492,
+      "crossings": 0,
+      "color": "green"
+    },
+    "8": {
+      "length": 311.1269837220809,
+      "euclid_dist": 294.64554977124635,
+      "crossings": 1,
+      "color": "green"
+    }
+  },
+  "prompt": "Which component does the wire from port 9 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

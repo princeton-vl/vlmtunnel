@@ -1,0 +1,73 @@
+{
+  "query_port": 5,
+  "correct_comp": "C5",
+  "mapping": {
+    "4": "C3",
+    "9": "C5",
+    "8": "C1",
+    "2": "C3",
+    "6": "C5",
+    "10": "C2",
+    "5": "C5",
+    "1": "C1",
+    "3": "C6"
+  },
+  "winfo": {
+    "4": {
+      "length": 325.9778405176271,
+      "euclid_dist": 230.2628932329306,
+      "crossings": 0,
+      "color": "purple"
+    },
+    "9": {
+      "length": 400.93033235582845,
+      "euclid_dist": 327.7392256047481,
+      "crossings": 1,
+      "color": "green"
+    },
+    "8": {
+      "length": 325.9779177603339,
+      "euclid_dist": 230.95670589961227,
+      "crossings": 0,
+      "color": "orange"
+    },
+    "2": {
+      "length": 325.2691193458119,
+      "euclid_dist": 236.71924298628534,
+      "crossings": 0,
+      "color": "green"
+    },
+    "6": {
+      "length": 463.1556100194849,
+      "euclid_dist": 384.36050785688167,
+      "crossings": 2,
+      "color": "blue"
+    },
+    "10": {
+      "length": 325.2691193458119,
+      "euclid_dist": 303.48640826238,
+      "crossings": 1,
+      "color": "orange"
+    },
+    "5": {
+      "length": 200.8183258569795,
+      "euclid_dist": 182.0988742414406,
+      "crossings": 1,
+      "color": "red"
+    },
+    "1": {
+      "length": 466.6904755831214,
+      "euclid_dist": 361.66835637086086,
+      "crossings": 3,
+      "color": "blue"
+    },
+    "3": {
+      "length": 311.1269837220809,
+      "euclid_dist": 295.97972903562163,
+      "crossings": 2,
+      "color": "blue"
+    }
+  },
+  "prompt": "Which component does the wire from port 5 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

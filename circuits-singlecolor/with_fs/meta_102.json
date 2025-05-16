@@ -1,0 +1,80 @@
+{
+  "query_port": 9,
+  "correct_comp": "C2",
+  "mapping": {
+    "10": "C3",
+    "2": "C2",
+    "9": "C2",
+    "4": "C3",
+    "8": "C1",
+    "1": "C5",
+    "6": "C1",
+    "5": "C4",
+    "3": "C5",
+    "7": "C6"
+  },
+  "winfo": {
+    "10": {
+      "length": 460.3282391928687,
+      "euclid_dist": 347.731218040601,
+      "crossings": 0,
+      "color": "green"
+    },
+    "2": {
+      "length": 388.2025045493221,
+      "euclid_dist": 302.00165562460086,
+      "crossings": 0,
+      "color": "green"
+    },
+    "9": {
+      "length": 236.17366491630688,
+      "euclid_dist": 222.48145990171855,
+      "crossings": 0,
+      "color": "green"
+    },
+    "4": {
+      "length": 386.08030252785494,
+      "euclid_dist": 279.3027031734566,
+      "crossings": 1,
+      "color": "green"
+    },
+    "8": {
+      "length": 468.8134557926078,
+      "euclid_dist": 350.1271197722336,
+      "crossings": 1,
+      "color": "green"
+    },
+    "1": {
+      "length": 463.15555230435086,
+      "euclid_dist": 412.8353182565658,
+      "crossings": 1,
+      "color": "green"
+    },
+    "6": {
+      "length": 454.1453785785138,
+      "euclid_dist": 333.7663853655727,
+      "crossings": 0,
+      "color": "green"
+    },
+    "5": {
+      "length": 161.22034611053283,
+      "euclid_dist": 114.6298390472568,
+      "crossings": 1,
+      "color": "green"
+    },
+    "3": {
+      "length": 311.1269837220809,
+      "euclid_dist": 279.25615481131297,
+      "crossings": 1,
+      "color": "green"
+    },
+    "7": {
+      "length": 388.2046446400808,
+      "euclid_dist": 315.79265349276255,
+      "crossings": 4,
+      "color": "green"
+    }
+  },
+  "prompt": "Which component does the wire from port 9 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

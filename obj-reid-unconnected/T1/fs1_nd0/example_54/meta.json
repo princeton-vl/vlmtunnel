@@ -1,0 +1,67 @@
+{
+  "trial": 1,
+  "few_shot": true,
+  "enable_distractors": true,
+  "allow_distractor_overlap": false,
+  "truth": "no",
+  "global_affine": [
+    -1.2321268443929831,
+    0.42293256657904854,
+    256,
+    256,
+    256,
+    256
+  ],
+  "transforms": [
+    "rotate"
+  ],
+  "jit_attrs": [
+    {
+      "type": "rectangle",
+      "color": "blue"
+    }
+  ],
+  "shapes": [
+    {
+      "type": "circle",
+      "color": "purple",
+      "angle": 0,
+      "z": 0,
+      "size": 48.95918050303108
+    },
+    {
+      "type": "rectangle",
+      "color": "teal",
+      "angle": 0,
+      "z": 1,
+      "width": 84.66269434606048,
+      "height": 66.81955889363597
+    },
+    {
+      "type": "rectangle",
+      "color": "orange",
+      "angle": 0,
+      "z": 2,
+      "width": 45.20280275174581,
+      "height": 35.17594318132481
+    },
+    {
+      "type": "rectangle",
+      "color": "blue",
+      "angle": 0,
+      "z": 3,
+      "width": 73.62300538819531,
+      "height": 48.2320924366663
+    },
+    {
+      "type": "square",
+      "color": "red",
+      "angle": 0,
+      "z": 4,
+      "width": 53.101169185775305,
+      "height": 53.101169185775305
+    }
+  ],
+  "concat": false,
+  "prompt": "The first image shows an object made of geometric shapes, which together form an object. Does this SAME object appear in the second image up to a rigid translation, rotation, and scale of the ENTIRE object as a whole? Respond with {yes} or {no}. There may be extra shapes in Image 2 that are not part of the original object; as long as the object from Image 1 is present, the answer is yes even if there are other shapes present."
+}

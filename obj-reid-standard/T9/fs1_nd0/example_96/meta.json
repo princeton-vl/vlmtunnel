@@ -1,0 +1,43 @@
+{
+  "trial": 9,
+  "few_shot": true,
+  "enable_distractors": true,
+  "allow_distractor_overlap": false,
+  "truth": "yes",
+  "global_affine": [
+    2.4493047221125543,
+    0.3572044825296599,
+    256,
+    256,
+    256,
+    256
+  ],
+  "transforms": [],
+  "jit_attrs": [],
+  "shapes": [
+    {
+      "type": "square",
+      "color": "red",
+      "angle": 0,
+      "z": 0,
+      "width": 88.6245889153639,
+      "height": 88.6245889153639
+    },
+    {
+      "type": "circle",
+      "color": "teal",
+      "angle": 0,
+      "z": 1,
+      "size": 73.802878096952
+    },
+    {
+      "type": "triangle",
+      "color": "red",
+      "angle": 0,
+      "z": 2,
+      "size": 55.620379177592525
+    }
+  ],
+  "concat": false,
+  "prompt": "\u201cThe first image shows an object made of connected geometric shapes, which together form an object. Does this SAME object appear in the second image? For example, if a component shape were to be rotated or translated separately from the entire composite-object, it would be a different object. Respond with {yes} or {no} (inside the curly brackets). There may be extra shapes in Image 2 that are not part of the original object; as long as the object from Image 1 is present, the answer is yes even if there are other shapes present."
+}

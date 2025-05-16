@@ -1,0 +1,31 @@
+{
+  "query_port": 8,
+  "correct_comp": "C4",
+  "mapping": {
+    "9": "C2",
+    "1": "C1",
+    "8": "C4"
+  },
+  "winfo": {
+    "9": {
+      "length": 385.3738903499089,
+      "euclid_dist": 360.86701151532264,
+      "crossings": 0,
+      "color": "green"
+    },
+    "1": {
+      "length": 467.4076818290586,
+      "euclid_dist": 442.6341604530766,
+      "crossings": 1,
+      "color": "purple"
+    },
+    "8": {
+      "length": 531.7442994522837,
+      "euclid_dist": 435.63287295611656,
+      "crossings": 0,
+      "color": "purple"
+    }
+  },
+  "prompt": "Which component does the wire from port 8 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}
