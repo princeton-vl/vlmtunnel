@@ -1,4 +1,0 @@
-{
-  "prompt": "Starting at the yellow circle, follow the labels for 2 steps. (For instance, in a different example of 2 steps, you might start at a blue triangle, then go to a red square, then a blue circle. The answer would be blue.) After those steps, what color are you on? Answer with the color in curly braces, e.g. {red}.",
-  "answer": "We start at the yellow circle, and then go to the orange square, and then end at the purple circle. {purple}"
-}

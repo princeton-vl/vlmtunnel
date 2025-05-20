@@ -1,4 +1,0 @@
-{
-  "prompt": "Starting at the yellow square, follow the labels for 3 steps. (For instance, in a different example of 3 steps, you might start at a blue triangle, then go to a red square, then a blue circle, and then end on a gold triangle. The answer would be gold.) After those steps, what color are you on? Answer with the color in curly braces, e.g. {red}.",
-  "answer": "We start at the yellow square, and then go to the orange square, and then go to the purple square, and then end at the purple circle. {purple}"
-}
