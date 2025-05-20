@@ -1,0 +1,41 @@
+{
+  "trial": "chain",
+  "few_shot": true,
+  "start_pair": [
+    "circle",
+    "lime"
+  ],
+  "final_color": "red",
+  "chain": [
+    [
+      "circle",
+      "lime"
+    ],
+    [
+      "triangle",
+      "orange"
+    ],
+    [
+      "circle",
+      "purple"
+    ],
+    [
+      "square",
+      "red"
+    ]
+  ],
+  "color_counts": {
+    "red": 3,
+    "orange": 3,
+    "purple": 3,
+    "gray": 2,
+    "yellow": 2,
+    "cyan": 2,
+    "green": 2,
+    "lime": 3,
+    "blue": 3,
+    "pink": 1,
+    "magenta": 1
+  },
+  "prompt": "Look at the image. Starting at the lime circle, follow the labels for 3 steps. (For instance, in a different example of 3 steps, you might start at a blue triangle, then go to a red square, then a blue circle, and then end on a gold triangle. The answer would be gold.) After those steps, what color are you on? Answer with the color in curly braces, e.g {{red}}."
+}

@@ -1,0 +1,73 @@
+{
+  "query_port": 3,
+  "correct_comp": "C4",
+  "mapping": {
+    "1": "C5",
+    "9": "C4",
+    "8": "C5",
+    "7": "C1",
+    "2": "C5",
+    "3": "C4",
+    "5": "C4",
+    "4": "C1",
+    "10": "C2"
+  },
+  "winfo": {
+    "1": {
+      "length": 159.80613254815972,
+      "euclid_dist": 114.58621208504974,
+      "crossings": 0,
+      "color": "red"
+    },
+    "9": {
+      "length": 325.2691193458119,
+      "euclid_dist": 286.0069929215018,
+      "crossings": 0,
+      "color": "orange"
+    },
+    "8": {
+      "length": 310.42238438021946,
+      "euclid_dist": 233.75414434828744,
+      "crossings": 0,
+      "color": "yellow"
+    },
+    "7": {
+      "length": 387.49451609022805,
+      "euclid_dist": 321.40317359976393,
+      "crossings": 1,
+      "color": "green"
+    },
+    "2": {
+      "length": 234.05564873789444,
+      "euclid_dist": 176.17321022221284,
+      "crossings": 1,
+      "color": "blue"
+    },
+    "3": {
+      "length": 467.39841035706155,
+      "euclid_dist": 343.96075357517174,
+      "crossings": 1,
+      "color": "purple"
+    },
+    "5": {
+      "length": 467.39819938546214,
+      "euclid_dist": 409.81581228644654,
+      "crossings": 3,
+      "color": "#FF1493"
+    },
+    "4": {
+      "length": 461.8443432722513,
+      "euclid_dist": 385.9961139700761,
+      "crossings": 1,
+      "color": "#00FFFF"
+    },
+    "10": {
+      "length": 566.3932209176658,
+      "euclid_dist": 414.96626368898956,
+      "crossings": 1,
+      "color": "#FFD700"
+    }
+  },
+  "prompt": "Which component does the wire from port 3 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

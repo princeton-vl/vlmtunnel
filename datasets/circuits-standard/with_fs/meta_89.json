@@ -1,0 +1,73 @@
+{
+  "query_port": 8,
+  "correct_comp": "C4",
+  "mapping": {
+    "6": "C3",
+    "3": "C4",
+    "9": "C2",
+    "7": "C1",
+    "1": "C1",
+    "8": "C4",
+    "5": "C4",
+    "2": "C5",
+    "4": "C2"
+  },
+  "winfo": {
+    "6": {
+      "length": 325.2691193458119,
+      "euclid_dist": 235.80500418778223,
+      "crossings": 0,
+      "color": "blue"
+    },
+    "3": {
+      "length": 311.1269837220809,
+      "euclid_dist": 226.06193841511666,
+      "crossings": 0,
+      "color": "blue"
+    },
+    "9": {
+      "length": 236.17366491630688,
+      "euclid_dist": 191.14915641979695,
+      "crossings": 0,
+      "color": "purple"
+    },
+    "7": {
+      "length": 387.49451609022805,
+      "euclid_dist": 275.86228448267445,
+      "crossings": 0,
+      "color": "purple"
+    },
+    "1": {
+      "length": 463.1559846052756,
+      "euclid_dist": 327.2201094064972,
+      "crossings": 0,
+      "color": "green"
+    },
+    "8": {
+      "length": 311.1269837220809,
+      "euclid_dist": 292.0,
+      "crossings": 2,
+      "color": "red"
+    },
+    "5": {
+      "length": 461.03362133362896,
+      "euclid_dist": 326.2207841324645,
+      "crossings": 1,
+      "color": "red"
+    },
+    "2": {
+      "length": 288.4995667241114,
+      "euclid_dist": 263.00570336021235,
+      "crossings": 1,
+      "color": "red"
+    },
+    "4": {
+      "length": 386.08030252785494,
+      "euclid_dist": 320.0281237641467,
+      "crossings": 1,
+      "color": "yellow"
+    }
+  },
+  "prompt": "Which component does the wire from port 8 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

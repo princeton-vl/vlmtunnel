@@ -1,0 +1,37 @@
+{
+  "trial": "chain",
+  "few_shot": true,
+  "start_pair": [
+    "triangle",
+    "pink"
+  ],
+  "final_color": "pink",
+  "chain": [
+    [
+      "triangle",
+      "pink"
+    ],
+    [
+      "triangle",
+      "purple"
+    ],
+    [
+      "circle",
+      "pink"
+    ]
+  ],
+  "color_counts": {
+    "gray": 1,
+    "lime": 3,
+    "magenta": 3,
+    "blue": 2,
+    "yellow": 3,
+    "orange": 2,
+    "purple": 3,
+    "green": 2,
+    "cyan": 1,
+    "red": 2,
+    "pink": 3
+  },
+  "prompt": "Starting at the pink triangle, follow the labels for 2 steps. (For instance, in a different example of 2 steps, you might start at a blue triangle, then go to a red square, then a blue circle. The answer would be blue.) After those steps, what color are you on? Answer with the color in curly braces, e.g. {red}."
+}

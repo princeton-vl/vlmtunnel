@@ -1,0 +1,73 @@
+{
+  "query_port": 7,
+  "correct_comp": "C4",
+  "mapping": {
+    "4": "C5",
+    "8": "C7",
+    "2": "C6",
+    "6": "C4",
+    "10": "C2",
+    "7": "C4",
+    "3": "C1",
+    "1": "C1",
+    "5": "C3"
+  },
+  "winfo": {
+    "4": {
+      "length": 453.25933182538586,
+      "euclid_dist": 394.89365657098114,
+      "crossings": 0,
+      "color": "red"
+    },
+    "8": {
+      "length": 325.97705025965655,
+      "euclid_dist": 304.13977050034083,
+      "crossings": 0,
+      "color": "orange"
+    },
+    "2": {
+      "length": 378.3028393091143,
+      "euclid_dist": 352.40459701882435,
+      "crossings": 1,
+      "color": "yellow"
+    },
+    "6": {
+      "length": 463.15578952582723,
+      "euclid_dist": 339.1592546282646,
+      "crossings": 1,
+      "color": "green"
+    },
+    "10": {
+      "length": 466.6904755831214,
+      "euclid_dist": 450.03999822238023,
+      "crossings": 3,
+      "color": "blue"
+    },
+    "7": {
+      "length": 387.494516090228,
+      "euclid_dist": 322.45309736456244,
+      "crossings": 3,
+      "color": "purple"
+    },
+    "3": {
+      "length": 311.1269837220809,
+      "euclid_dist": 267.4023186137323,
+      "crossings": 1,
+      "color": "#FF1493"
+    },
+    "1": {
+      "length": 159.1009368524222,
+      "euclid_dist": 133.98880550254935,
+      "crossings": 0,
+      "color": "#00FFFF"
+    },
+    "5": {
+      "length": 435.46823439976924,
+      "euclid_dist": 339.5585369269929,
+      "crossings": 0,
+      "color": "#FFD700"
+    }
+  },
+  "prompt": "Which component does the wire from port 7 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

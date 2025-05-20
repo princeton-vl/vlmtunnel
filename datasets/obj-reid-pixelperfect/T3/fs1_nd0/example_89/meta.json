@@ -1,0 +1,59 @@
+{
+  "trial": 3,
+  "few_shot": true,
+  "enable_distractors": true,
+  "allow_distractor_overlap": false,
+  "truth": "yes",
+  "global_affine": [
+    0.0,
+    1.0,
+    256,
+    256,
+    256,
+    256
+  ],
+  "transforms": [],
+  "jit_attrs": [],
+  "shapes": [
+    {
+      "type": "polygon",
+      "color": "green",
+      "angle": 0,
+      "z": 0,
+      "size": 50.57093517804345,
+      "n": 6
+    },
+    {
+      "type": "circle",
+      "color": "magenta",
+      "angle": 0,
+      "z": 1,
+      "size": 87.76485839966722
+    },
+    {
+      "type": "square",
+      "color": "teal",
+      "angle": 0,
+      "z": 2,
+      "width": 41.639361011723466,
+      "height": 41.639361011723466
+    },
+    {
+      "type": "line",
+      "color": "green",
+      "angle": 0,
+      "z": 3,
+      "size": 35.89996712557893
+    },
+    {
+      "type": "square",
+      "color": "teal",
+      "angle": 0,
+      "z": 4,
+      "width": 96.4625691135733,
+      "height": 96.4625691135733
+    }
+  ],
+  "concat": false,
+  "prompt": "\u201cThe first image shows an object made of geometric shapes, which together form an object. Does this SAME object appear in the second image? For example, if a component shape were to be rotated or translated, it would be a different object. Respond with {yes} or {no} (inside the curly brackets). There may be extra shapes in Image 2 that are not part of the original object; as long as the object from Image 1 is present, the answer is yes even if there are other shapes present."
+}

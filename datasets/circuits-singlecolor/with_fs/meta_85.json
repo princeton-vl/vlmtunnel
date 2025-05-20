@@ -1,0 +1,73 @@
+{
+  "query_port": 8,
+  "correct_comp": "C7",
+  "mapping": {
+    "6": "C3",
+    "9": "C5",
+    "5": "C7",
+    "4": "C2",
+    "2": "C4",
+    "3": "C8",
+    "10": "C3",
+    "7": "C3",
+    "8": "C7"
+  },
+  "winfo": {
+    "6": {
+      "length": 454.1453785785138,
+      "euclid_dist": 333.7663853655727,
+      "crossings": 0,
+      "color": "red"
+    },
+    "9": {
+      "length": 323.85490578343877,
+      "euclid_dist": 283.425475213503,
+      "crossings": 0,
+      "color": "red"
+    },
+    "5": {
+      "length": 325.2691193458119,
+      "euclid_dist": 255.82024939398366,
+      "crossings": 0,
+      "color": "red"
+    },
+    "4": {
+      "length": 236.17366491630688,
+      "euclid_dist": 191.14915641979695,
+      "crossings": 1,
+      "color": "red"
+    },
+    "2": {
+      "length": 325.2691193458119,
+      "euclid_dist": 239.841614404173,
+      "crossings": 0,
+      "color": "red"
+    },
+    "3": {
+      "length": 466.6904755831214,
+      "euclid_dist": 397.7235220602372,
+      "crossings": 0,
+      "color": "red"
+    },
+    "10": {
+      "length": 468.824886009187,
+      "euclid_dist": 448.00558032238837,
+      "crossings": 2,
+      "color": "red"
+    },
+    "7": {
+      "length": 468.8135039041101,
+      "euclid_dist": 352.17751205890477,
+      "crossings": 2,
+      "color": "red"
+    },
+    "8": {
+      "length": 466.6904755831214,
+      "euclid_dist": 418.88423221696945,
+      "crossings": 3,
+      "color": "red"
+    }
+  },
+  "prompt": "Which component does the wire from port 8 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

@@ -1,0 +1,4 @@
+{
+  "prompt": "Starting at the blue square, follow the labels for 4 steps. (For instance, in a different example of 4 steps, you might start at a blue triangle, then go to a red square, then a blue circle, then a magenta triangle, then a green circle. The answer would be green.) After those steps, what color are you on? Answer with the color in curly braces, e.g. {red}.",
+  "answer": "We start at the blue square, and then go to the purple triangle, and then go to the yellow square, and then go to the red square, and then end at the gray square. {gray}"
+}

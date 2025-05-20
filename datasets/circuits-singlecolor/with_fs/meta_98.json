@@ -1,0 +1,73 @@
+{
+  "query_port": 9,
+  "correct_comp": "C4",
+  "mapping": {
+    "2": "C1",
+    "1": "C2",
+    "3": "C10",
+    "8": "C7",
+    "7": "C4",
+    "5": "C8",
+    "9": "C4",
+    "6": "C3",
+    "10": "C3"
+  },
+  "winfo": {
+    "2": {
+      "length": 465.9845204385888,
+      "euclid_dist": 330.80054413498175,
+      "crossings": 0,
+      "color": "blue"
+    },
+    "1": {
+      "length": 462.44783489600206,
+      "euclid_dist": 369.0121949204389,
+      "crossings": 0,
+      "color": "blue"
+    },
+    "3": {
+      "length": 311.1269837220809,
+      "euclid_dist": 225.1754871206011,
+      "crossings": 1,
+      "color": "blue"
+    },
+    "8": {
+      "length": 466.6904755831214,
+      "euclid_dist": 403.3906295391602,
+      "crossings": 2,
+      "color": "blue"
+    },
+    "7": {
+      "length": 325.2691193458119,
+      "euclid_dist": 287.20027855139693,
+      "crossings": 0,
+      "color": "blue"
+    },
+    "5": {
+      "length": 327.3946992142048,
+      "euclid_dist": 272.96336750560505,
+      "crossings": 2,
+      "color": "blue"
+    },
+    "9": {
+      "length": 337.29068847030885,
+      "euclid_dist": 331.6941362158819,
+      "crossings": 1,
+      "color": "blue"
+    },
+    "6": {
+      "length": 159.80613254815972,
+      "euclid_dist": 147.6279106402309,
+      "crossings": 0,
+      "color": "blue"
+    },
+    "10": {
+      "length": 460.32765137712653,
+      "euclid_dist": 326.3449095665505,
+      "crossings": 3,
+      "color": "blue"
+    }
+  },
+  "prompt": "Which component does the wire from port 9 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

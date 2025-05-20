@@ -1,0 +1,66 @@
+{
+  "query_port": 7,
+  "correct_comp": "C5",
+  "mapping": {
+    "5": "C3",
+    "3": "C3",
+    "7": "C5",
+    "9": "C2",
+    "2": "C2",
+    "4": "C3",
+    "10": "C1",
+    "8": "C1"
+  },
+  "winfo": {
+    "5": {
+      "length": 460.32751047551073,
+      "euclid_dist": 327.28733553255614,
+      "crossings": 0,
+      "color": "purple"
+    },
+    "3": {
+      "length": 310.4219689544797,
+      "euclid_dist": 225.83400983908513,
+      "crossings": 0,
+      "color": "green"
+    },
+    "7": {
+      "length": 468.8131402312922,
+      "euclid_dist": 336.7328317821118,
+      "crossings": 1,
+      "color": "purple"
+    },
+    "9": {
+      "length": 325.2691193458119,
+      "euclid_dist": 235.80500418778223,
+      "crossings": 0,
+      "color": "red"
+    },
+    "2": {
+      "length": 467.4002812058362,
+      "euclid_dist": 385.3582748560098,
+      "crossings": 3,
+      "color": "green"
+    },
+    "4": {
+      "length": 386.08030252785494,
+      "euclid_dist": 273.22152184628504,
+      "crossings": 1,
+      "color": "yellow"
+    },
+    "10": {
+      "length": 468.81347152575825,
+      "euclid_dist": 350.8005131125096,
+      "crossings": 2,
+      "color": "purple"
+    },
+    "8": {
+      "length": 468.81307228855337,
+      "euclid_dist": 334.22896343674347,
+      "crossings": 2,
+      "color": "red"
+    }
+  },
+  "prompt": "Which component does the wire from port 7 on the breadboard, which is the gray rectangle with numbered ports, connect to? A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. A wire will NEVER turn at the same spot that it intersects another wire, and wires do not change colors. Answer with the component label in curly braces, e.g {C3}.",
+  "few_shot": true
+}

@@ -1,0 +1,37 @@
+{
+  "trial": "chain",
+  "few_shot": true,
+  "start_pair": [
+    "square",
+    "purple"
+  ],
+  "final_color": "green",
+  "chain": [
+    [
+      "square",
+      "purple"
+    ],
+    [
+      "square",
+      "blue"
+    ],
+    [
+      "triangle",
+      "green"
+    ]
+  ],
+  "color_counts": {
+    "green": 2,
+    "red": 2,
+    "pink": 2,
+    "magenta": 3,
+    "blue": 3,
+    "orange": 2,
+    "yellow": 2,
+    "purple": 3,
+    "lime": 3,
+    "gray": 1,
+    "cyan": 2
+  },
+  "prompt": "Starting at the purple square, follow the labels for 2 steps. (For instance, in a different example of 2 steps, you might start at a blue triangle, then go to a red square, then a blue circle. The answer would be blue.) After those steps, what color are you on? Answer with the color in curly braces, e.g. {red}."
+}

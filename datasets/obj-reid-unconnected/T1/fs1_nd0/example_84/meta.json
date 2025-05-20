@@ -1,0 +1,44 @@
+{
+  "trial": 1,
+  "few_shot": true,
+  "enable_distractors": true,
+  "allow_distractor_overlap": false,
+  "truth": "yes",
+  "global_affine": [
+    2.3629874705757468,
+    0.6060939321877775,
+    256,
+    256,
+    256,
+    256
+  ],
+  "transforms": [],
+  "jit_attrs": [],
+  "shapes": [
+    {
+      "type": "triangle",
+      "color": "blue",
+      "angle": 0,
+      "z": 0,
+      "size": 76.27369024304927
+    },
+    {
+      "type": "oval",
+      "color": "teal",
+      "angle": 0,
+      "z": 1,
+      "width": 89.75253616026015,
+      "height": 69.66844171231608
+    },
+    {
+      "type": "oval",
+      "color": "green",
+      "angle": 0,
+      "z": 2,
+      "width": 61.9675485448431,
+      "height": 72.33169141619909
+    }
+  ],
+  "concat": false,
+  "prompt": "The first image shows an object made of geometric shapes, which together form an object. Does this SAME object appear in the second image up to a rigid translation, rotation, and scale of the ENTIRE object as a whole? Respond with {yes} or {no}. There may be extra shapes in Image 2 that are not part of the original object; as long as the object from Image 1 is present, the answer is yes even if there are other shapes present."
+}
