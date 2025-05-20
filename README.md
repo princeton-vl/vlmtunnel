@@ -1,7 +1,4 @@
-=========================================
- Nonlocal Visual Reasoning Evaluation Suite
-=========================================
-
+# Nonlocal Visual Reasoning Evaluation Suit
 This suite evaluates Vision-Language Models (VLMs) on their capacity for nonlocal visual reasoning – tasks requiring the integration of evidence from multiple image regions. It's designed to test three core visual reasoning skills: comparative perception, saccadic search, and smooth visual search.
 
 -----------------------------------------
