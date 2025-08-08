@@ -1,6 +1,8 @@
 # VLMs Have Tunnel Vision: Nonlocal Visual Reasoning Evaluation Suite
 This suite evaluates Vision-Language Models (VLMs) on their capacity for nonlocal visual reasoning – tasks requiring the integration of evidence from multiple image regions. It's designed to test three core visual reasoning skills: comparative perception, saccadic search, and smooth visual search.
 
+
+### Check out the paper here: https://arxiv.org/abs/2507.13361
 -----------------------------------------
 ## Overview
 
@@ -9,7 +11,7 @@ The suite includes three main task categories:
 2.  **Visual Scavenger Hunt (Chain Trial)**: Tests saccadic search by requiring models to follow a chain of visual cues across a grid.
 3.  **Circuit Connections**: Tests smooth visual search by asking models to trace wires on a circuit board.
 
-This code allows you to verify our results, generate new datasets, run models against those datasets, and analyze the results(WIP).
+This code allows you to verify our results, generate new datasets, run models against those datasets, and analyze the results.
 
 -----------------------------------------
 
@@ -18,11 +20,8 @@ This code allows you to verify our results, generate new datasets, run models ag
 ### Prerequisites
 
 1.  **Python 3.8+**
-2.  **Required Libraries**: Install necessary Python packages. You can typically install them using pip:
-    ```bash
-    pip install Pillow numpy pandas statsmodels scipy scikit-learn openai requests torch transformers tabulate
-    ```
-    (Ensure `torch` and `transformers` are installed if you plan to use local models via `infclient.py`).
+2.  **Required Libraries**:  Pillow numpy pandas statsmodels scipy scikit-learn openai requests torch transformers tabulate
+    (Ensure `torch` and `transformers` are installed if you plan to use local models).
 3.  **API Keys**: If using OpenAI or OpenRouter, set your API keys as environment variables:
     * `OPENAI_API_KEY="your_openai_key"`
     * `OPENROUTER_API_KEY="your_openrouter_key"`
@@ -123,7 +122,7 @@ python main.py objreid \
 
 ---
 
-### 2. 🗺️ Visual Scavenger Hunt (`visual_attention`)
+### 2. Visual Scavenger Hunt (`visual_attention`)
 
 **Generation-only flags**
 
@@ -162,7 +161,7 @@ python main.py visual_attention \
 
 ---
 
-### 3. 🔌 Circuit Connections (`circuits`)
+### 3. Circuit Connections (`circuits`)
 
 **Generation-only flags**
 
