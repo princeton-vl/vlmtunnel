@@ -31,16 +31,21 @@ This code allows you to verify our results, generate new datasets, run models ag
 
 All functionality is exposed through **`main.py`**.
 
+**Note:** If you're using a conda environment, make sure to activate it first:
+```bash
+conda activate svlm
+```
+
 ### 1. Basic pattern
 
 ```bash
-python main.py <TASK_NAME> [COMMON_OPTIONS] [TASK_SPECIFIC_OPTIONS]
+python main.py [COMMON_OPTIONS] <TASK_NAME> [TASK_SPECIFIC_OPTIONS]
 ```
 
 *Example*
 
 ```bash
-python main.py objreid --num-examples 20 --verbose
+python main.py --num-examples 20 --verbose objreid
 ```
 
 ### 2. Common options (work for every task)
@@ -85,39 +90,42 @@ Trial 9 corresponds to the 'Standard' variant from the paper; 1 corresponds to t
 Create a *single* test image for trial 9:
 
 ```bash
-python main.py objreid --test-image --objreid-trials 9
+python main.py --test-image objreid --objreid-trials 9
 ```
 
 Make a 50-example dataset for trial 1, **few-shot**, **no distractors**:
 
 ```bash
-python main.py objreid \
+python main.py \
   --make-dataset ./my_objreid_T1_fs_nodist \
-  --objreid-trials 1 \
   --num-examples 50 \
   --few-shot \
+  objreid \
+  --objreid-trials 1 \
   --objreid-no-distractors
 ```
 
 Evaluate GPT-4o on the *fs1_nd0* split of trial 9 in an existing dataset:
 
 ```bash
-python main.py objreid \
+python main.py \
   --load-dataset ./objreid-data \
   --models openai:gpt-4o-2024-08-06 \
-  --objreid-trials 9 \
   --few-shot \
-  --verbose
+  --verbose \
+  objreid \
+  --objreid-trials 9
 ```
 
 Live inference with a **local** model (trial 3, 5 examples):
 
 ```bash
-python main.py objreid \
+python main.py \
   --models local:/hfpath/to/your/local_model \
-  --objreid-trials 3 \
   --num-examples 5 \
-  --verbose
+  --verbose \
+  objreid \
+  --objreid-trials 3
 ```
 
 ---
@@ -137,26 +145,28 @@ python main.py objreid \
 One test image with a 3-step chain:
 
 ```bash
-python main.py visual_attention --test-image --va-chain-length 3
+python main.py --test-image visual_attention --va-chain-length 3
 ```
 
 50-example few-shot dataset:
 
 ```bash
-python main.py visual_attention \
+python main.py \
   --make-dataset ./my_va_dataset_fs1 \
   --num-examples 50 \
-  --few-shot
+  --few-shot \
+  visual_attention
 ```
 
 Evaluate Gemini Flash on the non-few-shot split:
 
 ```bash
-python main.py visual_attention \
+python main.py \
   --load-dataset ./my_va_dataset \
   --models openrouter:google/gemini-2.5-pro-preview \
   --num-examples 30 \
-  --verbose
+  --verbose \
+  visual_attention
 ```
 
 ---
@@ -179,8 +189,9 @@ python main.py visual_attention \
 Single test image, unique wire colors, no crossings:
 
 ```bash
-python main.py circuits \
+python main.py \
   --test-image \
+  circuits \
   --wire-color-mode unique \
   --no-wire-crossing
 ```
@@ -188,20 +199,22 @@ python main.py circuits \
 50-example dataset, **single-color** wires:
 
 ```bash
-python main.py circuits \
+python main.py \
   --make-dataset ./my_circuits_singlecolor \
   --num-examples 50 \
+  circuits \
   --wire-color-mode single
 ```
 
 Evaluate GPT-4o on a few-shot, parameter-controlled live run:
 
 ```bash
-python main.py circuits \
+python main.py \
   --models openai:gpt-4o-2024-08-06 \
   --num-examples 5 \
   --few-shot \
+  --verbose \
+  circuits \
   --min-components 3 --max-components 5 \
-  --min-wires 4 --max-wires 8 \
-  --verbose
+  --min-wires 4 --max-wires 8
 ```

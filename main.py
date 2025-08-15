@@ -480,8 +480,8 @@ def handle_objreid_task(args: argparse.Namespace, parsed_models: List[Tuple[str,
                             "allow_distractor_overlap": args.objreid_allow_distractor_overlap,
                             "truth": "yes" if truth_val else "no",
                             "global_affine": affine_params, "transforms": jitter_transforms, "jit_attrs": jitter_attrs,
-                            "shapes": shapes_data.get("shapes_img1_desc", shapes_data.get("shapes", [])),
-                            "concat": shapes_data.get("concat", False), "prompt": current_prompt_text}
+                            "shapes": shapes_data,
+                            "concat": False, "prompt": current_prompt_text}
                     with open(os.path.join(ex_dir, "meta.json"), "w") as f: json.dump(meta, f, indent=2)
         print(f"{print_prefix} Dataset generation complete."); return
 

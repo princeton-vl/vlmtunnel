@@ -421,14 +421,15 @@ def generate_circuit_image(
     return img, query_port_num, correct_comp_label, bb_to_comp_map, wire_details
 
 def generate_two_shot_examples(
-    odir: str = "few_shot_examples",
+    odir: Optional[str] = "few_shot_examples",
     **gen_kwargs,
 ) -> List[Tuple[Image.Image, str, str]]:
     """
     Produce two canonical examples (saved under `odir`) and return:
       [(image, prompt_text, correct_component_answer_format), …]
     """
-    os.makedirs(odir, exist_ok=True)
+    if odir:
+        os.makedirs(odir, exist_ok=True)
     examples = []
     fs_gen_kwargs = {
         'min_components': gen_kwargs.get('min_components', 4),
@@ -445,7 +446,8 @@ def generate_two_shot_examples(
 
     for i in range(2):
         img, qport, comp_label, _, _ = generate_circuit_image(**fs_gen_kwargs) 
-        img.save(f"{odir}/two_shot_{i}.png")
+        if odir:
+            img.save(f"{odir}/two_shot_{i}.png")
         prompt = (
             f"Which component does the wire from port {qport} on the breadboard, which is the gray rectangle with numbered ports, connect to? "
             "A wire is a series of connected, same colored lines that go from the center of a port, represented on the screen as a white circle, to another port. Each wire only connects two ports, one at either end. "

@@ -35,8 +35,15 @@ def rotate_point(x: float, y: float, cx: float, cy: float, ang: float) -> Tuple[
 def compute_shape_radius(info: Dict[str, Any]) -> float:
     t = info['type']
     if t == 'circle': return info['size'] / 2.0
-    if t in ('square', 'rectangle', 'oval'):
+    if t in ('square', 'rectangle'):
         return math.hypot(info['width'] / 2.0, info['height'] / 2.0)
+    if t == 'oval':
+        # For ovals, account for potential rotation expansion
+        w, h = info['width'] / 2.0, info['height'] / 2.0
+        # When rotated with expand=True, diagonal becomes the bounding box
+        # Plus the 2.5x scaling factor used in drawing (lines 60-62)
+        base_radius = math.hypot(w, h)
+        return base_radius * 1.5  # Conservative estimate for 2.5x temp image + rotation
     if t == 'triangle': return info['size'] * math.sqrt(3) / 3.0 
     if t == 'polygon': return info['size'] 
     if t == 'line': return info['size'] / 2.0
@@ -104,8 +111,20 @@ def composite_bounds(shapes: List[Dict[str, Any]], offs: List[Tuple[float, float
     return min(all_x_coords), max(all_x_coords), min(all_y_coords), max(all_y_coords)
 
 def composite_fits_canvas(shapes: List[Dict[str, Any]], offs: List[Tuple[float, float]], canvas_size: int) -> bool:
-    min_x, max_x, min_y, max_y = composite_bounds(shapes, offs)
-    return max(abs(min_x), abs(max_x), abs(min_y), abs(max_y)) < canvas_size / 2.0 - 1.0
+    """Check if all shapes remain fully visible when drawn with center at (canvas_size//2, canvas_size//2)"""
+    center_x = center_y = canvas_size // 2
+    
+    for shape, (dx, dy) in zip(shapes, offs):
+        shape_radius = compute_shape_radius(shape)
+        # Final drawing coordinates will be: (center_x + dx, center_y + dy)
+        x0, y0 = center_x + dx, center_y + dy
+        
+        # Check if shape (with radius) stays within [0, canvas_size) bounds
+        if (x0 - shape_radius < 0 or x0 + shape_radius >= canvas_size or
+            y0 - shape_radius < 0 or y0 + shape_radius >= canvas_size):
+            return False
+    
+    return True
 
 def _is_connected_img(img: Image.Image) -> bool:
     np_img_lum = np.array(img.convert('L'))
@@ -496,13 +515,17 @@ def generate_objreid_trial_data(
 
 def generate_objreid_two_shot_examples(
     canvas_size: int,
-    output_dir: str, 
+    output_dir: Optional[str], 
     trial_conn1: bool, trial_conn2: bool, trial_no_affine: bool, 
     add_distractors: bool, allow_distractor_overlap: bool
 ) -> Tuple[Tuple[Image.Image, Image.Image], Tuple[Image.Image, Image.Image]]:
-    os.makedirs(output_dir, exist_ok=True)
-    fs_yes_dir = os.path.join(output_dir, "fs_yes")
-    fs_no_dir = os.path.join(output_dir, "fs_no")
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        fs_yes_dir = os.path.join(output_dir, "fs_yes")
+        fs_no_dir = os.path.join(output_dir, "fs_no")
+    else:
+        fs_yes_dir = None
+        fs_no_dir = None
 
     yes_i1, yes_i2, _, _, _, _, _ = generate_objreid_trial_data(
         canvas_size, trial_conn1, trial_conn2, trial_no_affine, True,

@@ -2,7 +2,7 @@ import os
 import random
 import math
 from PIL import Image, ImageDraw, ImageFont
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Optional
 from collections import Counter
 
 
@@ -222,12 +222,13 @@ def generate_two_shot_examples(
     grid_size: int,
     cell_size: int,
     chain_length: int,
-    odir: str = "fs_examples_visual_attention" # Specific dir name
+    odir: Optional[str] = "fs_examples_visual_attention" # Specific dir name
 ) -> List[Tuple[Image.Image, str, str]]:
     """
     Builds two few-shot examples specifically for the 'chain' trial.
     """
-    os.makedirs(odir, exist_ok=True)
+    if odir:
+        os.makedirs(odir, exist_ok=True)
     examples = []
     for i in range(2): 
         img, start_pair, final_color_answer, full_chain_path, _ = generate_chain_image(
@@ -258,7 +259,8 @@ def generate_two_shot_examples(
         # The answer is just the final color
         answer_text = f"{{{final_color_answer}}}"
         
-        img.save(os.path.join(odir, f"two_shot_chain_example_{i}.png"))
+        if odir:
+            img.save(os.path.join(odir, f"two_shot_chain_example_{i}.png"))
         examples.append((img, prompt_text, answer_text))
         
     return examples

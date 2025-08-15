@@ -62,9 +62,9 @@ class InferenceClient:
             fetcher = LocalFetcher(model_path=self.local_model_path, model_name=self.model_id)
             self.hf_model, self.hf_processor, self.hf_device = fetcher.get_model_params()
         elif self.backend == "openai":
-            key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_LAB_KEY")
+            key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_LAB_KEY") or os.getenv("OPENAI_PERSONAL_KEY")
             if not key:
-                raise RuntimeError("OpenAI API key not set (OPENAI_API_KEY or OPENAI_LAB_KEY).")
+                raise RuntimeError("OpenAI API key not set (OPENAI_API_KEY, OPENAI_LAB_KEY, or OPENAI_PERSONAL_KEY).")
             self.openai_client = openai.OpenAI(api_key=key, timeout=180)
         elif self.backend == "openrouter":
             key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_LAB_TOK")
