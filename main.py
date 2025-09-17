@@ -622,7 +622,7 @@ def handle_objreid_task(args: argparse.Namespace, parsed_models: List[Tuple[str,
 
 def run_main():
     parser = argparse.ArgumentParser(description="Unified VQA and Object Re-ID Test Suite.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--models", nargs="+", default=["openai:gpt-4o"], help="Model specs (backend:model_id_or_path).")
+    parser.add_argument("--models", nargs="+", default=["openai:gpt-5-2025-08-07"], help="Model specs (backend:model_id_or_path).")
     parser.add_argument("--num-examples", type=int, default=10, help="Number of examples per trial/setting.")
     parser.add_argument("--few-shot", action="store_true", help="General strategy: use few-shot for live inference and target FS-tagged datasets.")
     parser.add_argument("--all-settings", action="store_true", help="Run all FS/non-FS and other applicable setting combinations.")
@@ -665,7 +665,7 @@ def run_main():
             circuits_demo_kwargs = {k: getattr(args, k) for k in ["min_components", "max_components", "min_ports", "max_ports","min_wires", "max_wires", "min_cc_wires", "max_cc_wires","wire_color_mode", "no_wire_crossing"]}
             raw_canonical_demos_for_task = gen_fs_circuits(odir=os.path.join(demo_live_base_dir, "circuits"), num_examples=2, **circuits_demo_kwargs)
         elif args.task_name == "visual_attention" and GEN_VA_AVAILABLE and gen_fs_va:
-            raw_canonical_demos_for_task = gen_fs_va(args.va_grid_size, args.va_cell_size, args.va_chain_length, odir=os.path.join(demo_live_base_dir, "visual_attention_chain"), num_examples=1)
+            raw_canonical_demos_for_task = gen_fs_va(args.va_grid_size, args.va_cell_size, args.va_chain_length, odir=os.path.join(demo_live_base_dir, "visual_attention_chain"))
         elif args.task_name == "objreid" and GEN_OBJREID_AVAILABLE and gen_fs_objreid:
             objreid_demo_c1, objreid_demo_c2, objreid_demo_na = False, False, False
             raw_canonical_demos_for_task = gen_fs_objreid(

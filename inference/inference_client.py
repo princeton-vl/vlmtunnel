@@ -1,6 +1,7 @@
 import os
 import sys
 import base64
+import time
 from io import BytesIO
 import gc
 from typing import List, Dict, Optional, Any
@@ -62,10 +63,10 @@ class InferenceClient:
             fetcher = LocalFetcher(model_path=self.local_model_path, model_name=self.model_id)
             self.hf_model, self.hf_processor, self.hf_device = fetcher.get_model_params()
         elif self.backend == "openai":
-            key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_LAB_KEY") or os.getenv("OPENAI_PERSONAL_KEY")
+            key =  os.getenv("OPENAI_LAB_KEY") or os.getenv("OPENAI_PERSONAL_KEY")
             if not key:
                 raise RuntimeError("OpenAI API key not set (OPENAI_API_KEY, OPENAI_LAB_KEY, or OPENAI_PERSONAL_KEY).")
-            self.openai_client = openai.OpenAI(api_key=key, timeout=180)
+            self.openai_client = openai.OpenAI(api_key=key, timeout=360)
         elif self.backend == "openrouter":
             key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_LAB_TOK")
             if not key:
@@ -112,35 +113,44 @@ class InferenceClient:
         return input_payload
 
     def _call_openai_custom_api(self, input_payload: List[Dict[str, Any]], max_tokens: int) -> str:
-        """Calls the OpenAI API using the user-specified client.responses.create() method."""
+        """Calls the OpenAI API using the user-specified client.responses.create() method with retry logic."""
         if not self.openai_client:
             return "{error_openai_client_not_initialized}"
-        try:
-            response = self.openai_client.responses.create( # type: ignore
-                model=self.model_id,
-                reasoning={"effort": "high"},
-                input=input_payload
-            )
 
-            if hasattr(response, 'output_text'):
-                return response.output_text or "{err_openai_empty_output_text}"
+        for attempt in range(2):
+            try:
+                response = self.openai_client.responses.create( # type: ignore
+                    model=self.model_id,
+                    reasoning={"effort": "high"},
+                    input=input_payload
+                )
 
-            if hasattr(response, 'choices') and response.choices and \
-               hasattr(response.choices[0], 'message') and response.choices[0].message and \
-               hasattr(response.choices[0].message, 'content'):
-                return response.choices[0].message.content or "{err_openai_empty_content}"
-            
-            print(f"[OpenAI Warning ({self.model_id})] Unexpected response structure: {response}", file=sys.stderr)
-            return "{err_openai_unexpected_response_structure}"
+                if hasattr(response, 'output_text'):
+                    return response.output_text or "{err_openai_empty_output_text}"
 
-        except AttributeError as ae:
-            print(f"[OpenAI Error ({self.model_id})] 'responses.create' method not found on client or response structure incorrect. Error: {ae}", file=sys.stderr)
-            return "{err_openai_attribute_error}"
-        except Exception as e:
-            print(f"[OpenAI API Error ({self.model_id})] {e}", file=sys.stderr)
-            if hasattr(e, 'response') and hasattr(e.response, 'text'):
-                 print(f"    Response body: {e.response.text}", file=sys.stderr)
-            return "{err_openai_api_exception}"
+                if hasattr(response, 'choices') and response.choices and \
+                   hasattr(response.choices[0], 'message') and response.choices[0].message and \
+                   hasattr(response.choices[0].message, 'content'):
+                    return response.choices[0].message.content or "{err_openai_empty_content}"
+
+                print(f"[OpenAI Warning ({self.model_id})] Unexpected response structure: {response}", file=sys.stderr)
+                return "{err_openai_unexpected_response_structure}"
+
+            except AttributeError as ae:
+                print(f"[OpenAI Error ({self.model_id})] 'responses.create' method not found on client or response structure incorrect. Error: {ae}", file=sys.stderr)
+                return "{err_openai_attribute_error}"
+            except Exception as e:
+                print(f"[OpenAI API Error ({self.model_id})] Attempt {attempt + 1}/2 failed: {e}", file=sys.stderr)
+                if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                     print(f"    Response body: {e.response.text}", file=sys.stderr)
+
+                if attempt == 0:
+                    print(f"[OpenAI Retry ({self.model_id})] Waiting 60 seconds before retry...", file=sys.stderr)
+                    time.sleep(60)
+                else:
+                    return "{err_openai_api_exception}"
+
+        return "{err_openai_api_exception}"
 
     def _prepare_openrouter_messages(self,
                                    prompt_text: str,
@@ -178,34 +188,49 @@ class InferenceClient:
         return messages
 
     def _call_openrouter_api(self, messages_payload: List[Dict[str, Any]], max_tokens: int) -> str:
-        """Calls the OpenRouter API."""
+        """Calls the OpenRouter API with retry logic."""
         if not self._or_headers:
             return "{error_or_config_missing}"
-        
         payload = {
             "model": self.model_id,
             "messages": messages_payload,
-            "max_tokens": max_tokens,
-            "temperature": 0.001, 
-            "reasoning": {"effort": "high"} 
+            "temperature": 0.001,
+            "reasoning": {"effort": "high"}
         }
-        try:
-            response = requests.post(self._or_endpoint, headers=self._or_headers, json=payload, timeout=180)
-            response.raise_for_status()
-            data = response.json()
-            
-            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            if not content and data.get("choices", [{}])[0].get("message", {}).get("tool_calls"):
-                print(f"[OpenRouter Note ({self.model_id})] Model returned tool calls instead of content.", file=sys.stderr)
-                return "{tool_call_response}"
-            return content or "{error_or_empty_response}"
-        except requests.exceptions.RequestException as e:
-            response_text = e.response.text if e.response else "N/A"
-            print(f"[OpenRouter API Request Error ({self.model_id})] {e}. Response: {response_text}", file=sys.stderr)
-            return "{error_or_request_failed}"
-        except Exception as e:
-            print(f"[OpenRouter Error ({self.model_id})] An unexpected error occurred: {e}", file=sys.stderr)
-            return "{error_or_unexpected}"
+
+        for attempt in range(2):
+            try:
+                response = requests.post(self._or_endpoint, headers=self._or_headers, json=payload, timeout=360)
+                response.raise_for_status()
+                data = response.json()
+                #breakpoint()
+
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                if not content and data.get("choices", [{}])[0].get("message", {}).get("tool_calls"):
+                    print(f"[OpenRouter Note ({self.model_id})] Model returned tool calls instead of content.", file=sys.stderr)
+                    return "{tool_call_response}"
+                return content or "{error_or_empty_response}"
+
+            except requests.exceptions.RequestException as e:
+                response_text = e.response.text if e.response else "N/A"
+                print(f"[OpenRouter API Request Error ({self.model_id})] Attempt {attempt + 1}/2 failed: {e}. Response: {response_text}", file=sys.stderr)
+
+                if attempt == 0:
+                    print(f"[OpenRouter Retry ({self.model_id})] Waiting 60 seconds before retry...", file=sys.stderr)
+                    time.sleep(60)
+                else:
+                    return "{error_or_request_failed}"
+
+            except Exception as e:
+                print(f"[OpenRouter Error ({self.model_id})] Attempt {attempt + 1}/2 failed with unexpected error: {e}", file=sys.stderr)
+
+                if attempt == 0:
+                    print(f"[OpenRouter Retry ({self.model_id})] Waiting 60 seconds before retry...", file=sys.stderr)
+                    time.sleep(60)
+                else:
+                    return "{error_or_unexpected}"
+
+        return "{error_or_unexpected}"
 
     def _prepare_local_messages(self,
                                 prompt_text: str,

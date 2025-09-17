@@ -398,7 +398,7 @@ def chain_color_difficulty(
     if not chain_records:
         print(f"\n[{analysis_title_prefix} (chain final color) skipped: no chain records]")
         return
-    analyze_presence_effects(chain_records, colors_list, key="label", 
+    analyze_presence_effects(chain_records, colors_list, key_to_check="label",
                              analysis_label=f"{analysis_title_prefix} (by final color)")
 
 def analyze_chain_any_presence(
