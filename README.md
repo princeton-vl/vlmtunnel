@@ -1,8 +1,20 @@
-# VLMs Have Tunnel Vision: Nonlocal Visual Reasoning Evaluation Suite
-This suite evaluates Vision-Language Models (VLMs) on their capacity for nonlocal visual reasoning – tasks requiring the integration of evidence from multiple image regions. It's designed to test three core visual reasoning skills: comparative perception, saccadic search, and smooth visual search.
+# VLMs Have Tunnel Vision
 
+<div align="center">
+    <p style="font-size: 45px;"> by 
+        <a href="mailto:sb6870@princeton.edu">Shmuel Berman</a><sup>1</sup>,
+        <a href="https://www.cs.princeton.edu/~jiadeng/">Jia Deng</a><sup>1</sup>
+    </p>
+    <p>
+        <sup>1</sup>Princeton University
+    </p>
 
-### Check out the paper here: https://arxiv.org/abs/2507.13361
+[![Website](http://img.shields.io/badge/Website-4b44ce.svg)](https://vlmtunnel.github.io/)
+[![arXiv](https://img.shields.io/badge/arXiv-2507.13361-b31b1b.svg)](https://arxiv.org/abs/2507.13361)
+</div>
+
+This repository contains the code and data for our paper `VLMs have Tunnel Vision: Evaluating Nonlocal Visual Reasoning in Leading VLMs`.
+
 -----------------------------------------
 ## Overview
 
@@ -20,8 +32,8 @@ This code allows you to verify our results, generate new datasets, run models ag
 ### Prerequisites
 
 1.  **Python 3.8+**
-2.  **Required Libraries**:  Pillow numpy pandas statsmodels scipy scikit-learn openai requests torch transformers tabulate
-    (Ensure `torch` and `transformers` are installed if you plan to use local models).
+2.  **Dependencies**: Install the packages listed in `requirements.txt` (e.g., `pip install -r requirements.txt`).
+    The list includes Pillow, numpy, pandas, statsmodels, scipy, scikit-learn, openai, requests, torch, transformers, and tabulate.
 3.  **API Keys**: If using OpenAI or OpenRouter, set your API keys as environment variables:
     * `OPENAI_API_KEY="your_openai_key"`
     * `OPENROUTER_API_KEY="your_openrouter_key"`
@@ -52,7 +64,7 @@ python main.py --num-examples 20 --verbose objreid
 
 * `--models BACKEND:MODEL_ID …`  
   Evaluate one or more models.  
-  Examples: `openai:gpt-4o-2024-08-06`, `openrouter:google/gemini-2.5-pro-preview`, `local:Qwen/Qwen2.5-VL-32B-Instruct`
+  Examples: `openai:o4-mini-2025-04-16`, `openrouter:google/gemini-2.5-pro-preview`, `local:Qwen/Qwen2.5-VL-32B-Instruct`
 * `--num-examples INT` – number of examples to run
 * `--few-shot` – enable few-shot evaluation (uses canonical demos made during make-dataset)
 * `--all-settings` – sweep over FS/non-FS and other settings (e.g. distractors)
@@ -105,12 +117,12 @@ python main.py \
   --objreid-no-distractors
 ```
 
-Evaluate GPT-4o on the *fs1_nd0* split of trial 9 in an existing dataset:
+Evaluate GPT o4 mini on the *fs1_nd0* split of trial 9 in an existing dataset:
 
 ```bash
 python main.py \
   --load-dataset ./objreid-data \
-  --models openai:gpt-4o-2024-08-06 \
+  --models openai:o4-mini-2025-04-16 \
   --few-shot \
   --verbose \
   objreid \
@@ -206,15 +218,27 @@ python main.py \
   --wire-color-mode single
 ```
 
-Evaluate GPT-4o on a few-shot, parameter-controlled live run:
+Evaluate GPT o4 mini on a few-shot, parameter-controlled live run:
 
 ```bash
 python main.py \
-  --models openai:gpt-4o-2024-08-06 \
+  --models openai:o4-mini-2025-04-16 \
   --num-examples 5 \
   --few-shot \
   --verbose \
   circuits \
   --min-components 3 --max-components 5 \
   --min-wires 4 --max-wires 8
+```
+
+-----------------------------------------
+## Citation
+
+```
+@article{berman2025vlmtunnel,
+  title={VLMs have Tunnel Vision: Evaluating Nonlocal Visual Reasoning in Leading VLMs},
+  author={Berman, Shmuel and Deng, Jia},
+  journal={arXiv preprint arXiv:2507.13361},
+  year={2025}
+}
 ```

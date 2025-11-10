@@ -506,8 +506,9 @@ def generate_objreid_trial_data(
 
     if output_dir_for_saving:
         os.makedirs(output_dir_for_saving, exist_ok=True)
-        img1.save(os.path.join(output_dir_for_saving, f"img1_{run_id}.png"))
-        img2_final.save(os.path.join(output_dir_for_saving, f"img2_{run_id}.png"))
+        suffix = f"_{run_id}" if run_id else ""
+        img1.save(os.path.join(output_dir_for_saving, f"img1{suffix}.png"))
+        img2_final.save(os.path.join(output_dir_for_saving, f"img2{suffix}.png"))
 
     return (img1, img2_final, shapes_img1, 
             global_affine_tuple, applied_jitter_transforms_list, 
